@@ -5,11 +5,14 @@
 #include <stdlib.h>
 #include <chrono>
 #include <string>
-#include "ImfArray.h"
-#include "ImfChannelList.h"
-#include "ImfRgbaFile.h"
-#include "ImfStandardAttributes.h"
+
+#include <ImfChannelList.h>
+#include <ImfInputFile.h>
+#include <ImfOutputFile.h>
+#include <ImfFrameBuffer.h>
+
 #include "rapidhash/rapidhash.h"
+
 #ifndef _MSC_VER
 #include <sys/fcntl.h>
 #endif
@@ -33,6 +36,18 @@ inline float time_duration_ms(std::chrono::high_resolution_clock::time_point t0)
     std::chrono::duration<float, std::milli> dt = std::chrono::high_resolution_clock::now() - t0;
     return dt.count();
 }
+
+struct Image
+{
+    struct Channel {
+        std::string name;
+        Imf::PixelType type;
+        size_t offset;
+    };
+    size_t width = 0, height = 0;
+    std::vector<Channel> channels;
+    std::vector<char> pixels;
+};
 
 struct CompressorTypeDesc
 {
@@ -77,7 +92,7 @@ static const CompressorDesc kTestCompr[] =
     //{ 5, 3 },
     { 5, 4 },
     //{ 5, 5 },
-    //{ 5, 6 }, // default
+    //{ 5, 6 },
     //{ 5, 7 },
     //{ 5, 8 },
     //{ 5, 9 },
@@ -108,127 +123,138 @@ struct ComprResult
 static ComprResult s_ResultRuns[kTestComprCount][kRunCount];
 static ComprResult s_Result[kTestComprCount];
 
-
-static bool TestFile(const char* filePath, int runIndex)
+static void LoadExrFile(const char* file_path, Image& r_image)
 {
-    using namespace Imf;
+    const char* fname_part = strrchr(file_path, '/');
+    printf("%s: ", fname_part ? fname_part+1 : file_path);
 
-    const char* fnamePart = strrchr(filePath, '/');
-    printf("%s: ", fnamePart ? fnamePart+1 : filePath);
+    MyIStream in_stream(file_path);
+    Imf::InputFile file(in_stream);
+    const Imf::Header& header = file.header();
+    const Imf::ChannelList& channels = header.channels();
+    Imath::Box2i dw = header.dataWindow();
+    r_image.width  = dw.max.x - dw.min.x + 1;
+    r_image.height = dw.max.y - dw.min.y + 1;
     
-    // read the input file
-    Array2D<Rgba> inPixels;
-    int inWidth = 0, inHeight = 0;
+    size_t offset = 0;
+    for (auto it = channels.begin(); it != channels.end(); ++it) {
+        const Imf::PixelType type = it.channel().type;
+        const size_t size = type == Imf::HALF ? 2 : 4;
+        r_image.channels.push_back({it.name(), type, offset});
+        offset += size;
+    }
+    
+    r_image.pixels.resize(r_image.width * r_image.height * offset);
+    printf("%ix%i, %i channels, %i bytes/pixel\n", int(r_image.width), int(r_image.height), int(r_image.channels.size()), int(offset));
+    
+    Imf::FrameBuffer fb;
+    for (const auto& ch : r_image.channels) {
+        char *ptr = r_image.pixels.data() + ch.offset - dw.min.x * offset - dw.min.y * offset * r_image.width;
+        fb.insert(ch.name, Imf::Slice(ch.type, ptr, offset, offset * r_image.width));
+    }
+    file.setFrameBuffer(fb);
+    file.readPixels(dw.min.y, dw.max.y);
+}
+
+static void SaveExrFile(const char* file_path, const Image& image, Imf::Compression compression, int cmp_level)
+{
+    Imf::Header header(int(image.width), int(image.height));
+    header.compression() = compression;
+    Imf::FrameBuffer fb;
+    if (cmp_level != 0)
     {
-		MyIStream inStream(filePath);
-        {
-            RgbaInputFile inFile(inStream);
-            const Header& inHeader = inFile.header();
-            const ChannelList& channels = inHeader.channels();
-            const auto dw = inFile.dataWindow();
-            inWidth = dw.max.x - dw.min.x + 1;
-            inHeight = dw.max.y - dw.min.y + 1;
-            printf("%ix%i ", inWidth, inHeight);
-            for(auto it = channels.begin(), itEnd = channels.end(); it != itEnd; ++it)
-                printf("%s:%s ", it.name(), GetPixelType(it.channel().type));
-            printf("\n");
-            inPixels.resizeErase(inHeight, inWidth);
-            inFile.setFrameBuffer(&inPixels[0][0] - dw.min.x - dw.min.y * inWidth, 1, inWidth);
-            inFile.readPixels(dw.min.y, dw.max.y);
-        }
+        if (compression == Imf::ZIP_COMPRESSION)
+            header.zipCompressionLevel() = cmp_level;
+    }
+    
+    const size_t stride = image.pixels.size() / image.width / image.height;
+    for (const Image::Channel& ch : image.channels)
+    {
+        header.channels().insert(ch.name, Imf::Channel(ch.type));
+        const char *ptr = image.pixels.data() + ch.offset;
+        fb.insert(ch.name, Imf::Slice(ch.type, (char*)ptr, stride, stride * image.width));
     }
 
+    MyOStream out_stream(file_path);
+    Imf::OutputFile file(out_stream, header);
+    file.setFrameBuffer(fb);
+    file.writePixels(int(image.height));
+}
+
+static bool TestFile(const char* file_path, int run_index)
+{
+    // read the input file
+    Image img_in;
+    LoadExrFile(file_path, img_in);
+
     // compute hash of pixel data
-    const size_t rawSize = inWidth * inHeight * sizeof(Rgba);
-    const uint64_t inPixelHash = rapidhash(&inPixels[0][0], rawSize);
+    const size_t raw_size = img_in.pixels.size();
+    const uint64_t hash_in = rapidhash(img_in.pixels.data(), img_in.pixels.size());
     
     // test various compression schemes
-    for (size_t cmpIndex = 0; cmpIndex < kTestComprCount; ++cmpIndex)
+    for (size_t cmp_index = 0; cmp_index < kTestComprCount; ++cmp_index)
     {
-        const auto& cmp = kTestCompr[cmpIndex];
-        const auto cmpType = kComprTypes[cmp.type].cmp;
-        const char* outFilePath = "_outfile.exr";
-        //char outFilePath[1000];
-        //sprintf(outFilePath, "_out%s-%i.exr", fnamePart+1, (int)cmpIndex);
-        double tWrite = 0;
-        double tRead = 0;
+        const auto& cmp = kTestCompr[cmp_index];
+        const auto cmp_type = kComprTypes[cmp.type].cmp;
+        const char* out_file_path = "_outfile.exr";
+        double t_write = 0;
+        double t_read = 0;
+
         // save the file with given compressor
-        auto tWrite0 = time_now();
-        if (cmpType == NUM_COMPRESSION_METHODS)
+        auto t_write_0 = time_now();
+        if (cmp_type == Imf::NUM_COMPRESSION_METHODS)
         {
-            FILE* f = fopen(outFilePath, "wb");
+            FILE* f = fopen(out_file_path, "wb");
             TurnOffFileCache(f);
-            fwrite(&inPixels[0][0], inWidth*inHeight, sizeof(Rgba), f);
+            fwrite(img_in.pixels.data(), img_in.pixels.size(), 1, f);
             fclose(f);
         }
         else
         {
-            Header outHeader(inWidth, inHeight);
-            outHeader.compression() = cmpType;
-            if (cmp.level != 0)
-            {
-                if (cmpType == ZIP_COMPRESSION)
-                    outHeader.zipCompressionLevel() = cmp.level;
-            }
-
-			MyOStream outStream(outFilePath);
-            {
-                RgbaOutputFile outFile(outStream, outHeader);
-                outFile.setFrameBuffer(&inPixels[0][0], 1, inWidth);
-                outFile.writePixels(inHeight);
-            }
+            SaveExrFile(out_file_path, img_in, cmp_type, cmp.level);
         }
-        tWrite = time_duration_ms(tWrite0) / 1000.0f;
-        size_t outSize = GetFileSize(outFilePath);
+        t_write = time_duration_ms(t_write_0) / 1000.0f;
+        size_t out_size = GetFileSize(out_file_path);
         
-        // read the file back
+        // purge filesystem caches
 #ifndef _MSC_VER
         int purgeVal = system("purge");
         if (purgeVal != 0)
             printf("WARN: failed to purge\n");
 #endif
         
-        Array2D<Rgba> gotPixels;
-        int gotWidth = 0, gotHeight = 0;
-        auto tRead0 = time_now();
-        if (cmpType == NUM_COMPRESSION_METHODS)
+        // read the file back
+        Image img_got;
+        auto t_read_0 = time_now();
+        if (cmp_type == Imf::NUM_COMPRESSION_METHODS)
         {
-            FILE* f = fopen(outFilePath, "rb");
+            FILE* f = fopen(out_file_path, "rb");
             TurnOffFileCache(f);
-            gotWidth = inWidth;
-            gotHeight = inHeight;
-            gotPixels.resizeErase(gotHeight, gotWidth);
-            fread(&gotPixels[0][0], gotWidth*gotHeight, sizeof(Rgba), f);
+            img_got.width = img_in.width;
+            img_got.height = img_in.height;
+            img_got.pixels.resize(img_in.pixels.size());
+            fread(img_got.pixels.data(), img_got.pixels.size(), 1, f);
             fclose(f);
         }
         else
         {
-			MyIStream gotStream(outFilePath);
-            {
-                RgbaInputFile gotFile(gotStream);
-                const auto dw = gotFile.dataWindow();
-                gotWidth = dw.max.x - dw.min.x + 1;
-                gotHeight = dw.max.y - dw.min.y + 1;
-                gotPixels.resizeErase(gotHeight, gotWidth);
-                gotFile.setFrameBuffer(&gotPixels[0][0] - dw.min.x - dw.min.y * gotWidth, 1, gotWidth);
-                gotFile.readPixels(dw.min.y, dw.max.y);
-            }
+            LoadExrFile(out_file_path, img_got);
         }
-        tRead = time_duration_ms(tRead0) / 1000.0f;
-        const uint64_t gotPixelHash = rapidhash(&gotPixels[0][0], gotWidth * gotHeight * sizeof(Rgba));
-        if (gotPixelHash != inPixelHash)
+        t_read = time_duration_ms(t_read_0) / 1000.0f;
+        const uint64_t hash_got = rapidhash(img_got.pixels.data(), img_got.pixels.size());
+        if (hash_got != hash_in)
         {
             printf("ERROR: file did not roundtrip exactly with compression %s\n", kComprTypes[cmp.type].name);
             return false;
         }
 
-        auto& res = s_ResultRuns[cmpIndex][runIndex];
-        res.rawSize += rawSize;
-        res.cmpSize += outSize;
-        res.tRead += tRead;
-        res.tWrite += tWrite;
+        auto& res = s_ResultRuns[cmp_index][run_index];
+        res.rawSize += raw_size;
+        res.cmpSize += out_size;
+        res.tRead += t_read;
+        res.tWrite += t_write;
         
-        remove(outFilePath);
+        remove(out_file_path);
     }
     
     return true;
@@ -343,7 +369,7 @@ R"(var options = {
     fprintf(fout,
 R"(        100:{}},
     hAxis: {title: 'Compression ratio', viewWindow: {min:1.0,max:4.0}},
-    vAxis: {title: 'Writing, MB/s', viewWindow: {min:0, max:1000}},
+    vAxis: {title: 'Writing, MB/s', viewWindow: {min:0, max:10000}},
     chartArea: {left:60, right:10, top:50, bottom:50},
     legend: {position: 'top'},
     colors: [
@@ -368,7 +394,7 @@ chw.draw(dw, options);
 
 options.title = 'Reading';
 options.vAxis.title = 'Reading, MB/s';
-options.vAxis.viewWindow.max = 2500;
+options.vAxis.viewWindow.max = 10000;
 var chr = new google.visualization.ScatterChart(document.getElementById('chart_r'));
 chr.draw(dr, options);
 }
