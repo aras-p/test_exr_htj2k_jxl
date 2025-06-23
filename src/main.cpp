@@ -6,10 +6,19 @@
 #include <chrono>
 #include <string>
 
+// OpenEXR
 #include <ImfChannelList.h>
 #include <ImfInputFile.h>
 #include <ImfOutputFile.h>
 #include <ImfFrameBuffer.h>
+#include <half.h>
+
+// libjxl
+#include <jxl/decode_cxx.h>
+#include <jxl/encode_cxx.h>
+#include <jxl/color_encoding.h>
+#include <jxl/thread_parallel_runner_cxx.h>
+#include <jxl/resizable_parallel_runner_cxx.h>
 
 #include "rapidhash/rapidhash.h"
 
@@ -25,6 +34,8 @@ const int kRunCount = 1;
 #else
 const int kRunCount = 4;
 #endif
+
+static JxlThreadParallelRunnerPtr s_jxl_runner;
 
 inline std::chrono::high_resolution_clock::time_point time_now()
 {
@@ -49,24 +60,34 @@ struct Image
     std::vector<char> pixels;
 };
 
+enum class CompressorType
+{
+    Raw,
+    ExrNone,
+    ExrRLE,
+    ExrPIZ,
+    ExrZIP,
+    ExrHT256,
+    Jxl,
+};
+
 struct CompressorTypeDesc
 {
     const char* name;
-    Imf::Compression cmp;
+    CompressorType cmp;
     const char* color;
     int large;
 };
 
 static const CompressorTypeDesc kComprTypes[] =
 {
-    {"Raw",     Imf::NUM_COMPRESSION_METHODS,   "a64436", 1}, // 0 - just raw bits read/write
-    {"None",    Imf::NO_COMPRESSION,            "a64436", 1}, // 1, red
-    {"RLE",     Imf::RLE_COMPRESSION,           "dc74ff", 0}, // 2, purple
-    {"PIZ",     Imf::PIZ_COMPRESSION,           "ff9a44", 0}, // 3, orange
-    {"Zips",    Imf::ZIPS_COMPRESSION,          "046f0e", 0}, // 4, dark green
-    {"Zip",     Imf::ZIP_COMPRESSION,           "12b520", 0}, // 5, green
-    {"HT256",     Imf::HT256_COMPRESSION,       "0094ef", 0}, // 6, blue
-	//{"ZFP",     Imf::ZFP_COMPRESSION,           "e01010", 1}, // 7, red
+    {"Raw",     CompressorType::Raw,        "a64436", 1}, // 0 - just raw bits read/write
+    {"None",    CompressorType::ExrNone,    "a64436", 1}, // 1, red
+    {"RLE",     CompressorType::ExrRLE,     "dc74ff", 0}, // 2, purple
+    {"PIZ",     CompressorType::ExrPIZ,     "ff9a44", 0}, // 3, orange
+    {"Zip",     CompressorType::ExrZIP,     "12b520", 0}, // 4, green
+    {"HT256",   CompressorType::ExrHT256,   "0094ef", 0}, // 5, blue
+	{"JXL",     CompressorType::Jxl,        "e01010", 1}, // 6, red
 };
 constexpr size_t kComprTypeCount = sizeof(kComprTypes) / sizeof(kComprTypes[0]);
 
@@ -79,37 +100,29 @@ struct CompressorDesc
 static const CompressorDesc kTestCompr[] =
 {
     //{ 0, 0 }, // just raw bits read/write
+    
+    // EXR
+#if 1
     { 1, 0 }, // None
     { 2, 0 }, // RLE
     { 3, 0 }, // PIZ
-    //{ 4, 0 }, // Zips
-
-    // Zip
-#if 1
-    //{ 5, 0 },
-    //{ 5, 2 },
-    { 5, 4 },
-    //{ 5, 6 },
-    //{ 5, 9 },
+    //{ 4, 2 },
+    { 4, 4 }, // ZIP default
+    //{ 4, 6 },
+    //{ 4, 9 },
+    { 5, 0 }, // HT256
 #endif
-
-    // HT256
-    { 6, 0 },
+    
+    // JXL
+#if 1
+    //{ 6, 1 },
+    { 6, 3 },
+    //{ 6, 5 },
+    //{ 6, 0 }, // default level 7
+    //{ 6, 9 },
+#endif
 };
 constexpr size_t kTestComprCount = sizeof(kTestCompr) / sizeof(kTestCompr[0]);
-
-
-static const char* GetPixelType(Imf::PixelType p)
-{
-    switch (p)
-    {
-    case Imf::UINT: return "int";
-    case Imf::HALF: return "half";
-    case Imf::FLOAT: return "float";
-    default: return "<unknown>";
-    }
-}
-
 
 struct ComprResult
 {
@@ -150,8 +163,18 @@ static void LoadExrFile(const char* file_path, Image& r_image)
     file.readPixels(dw.min.y, dw.max.y);
 }
 
-static void SaveExrFile(const char* file_path, const Image& image, Imf::Compression compression, int cmp_level)
+static void SaveExrFile(const char* file_path, const Image& image, CompressorType cmp_type, int cmp_level)
 {
+    Imf::Compression compression = Imf::NUM_COMPRESSION_METHODS;
+    switch (cmp_type) {
+        case CompressorType::ExrNone: compression = Imf::NO_COMPRESSION; break;
+        case CompressorType::ExrRLE: compression = Imf::RLE_COMPRESSION; break;
+        case CompressorType::ExrPIZ: compression = Imf::PIZ_COMPRESSION; break;
+        case CompressorType::ExrZIP: compression = Imf::ZIP_COMPRESSION; break;
+        case CompressorType::ExrHT256: compression = Imf::HT256_COMPRESSION; break;
+        default: break;
+    }
+    
     Imf::Header header(int(image.width), int(image.height));
     header.compression() = compression;
     Imf::FrameBuffer fb;
@@ -175,10 +198,346 @@ static void SaveExrFile(const char* file_path, const Image& image, Imf::Compress
     file.writePixels(int(image.height));
 }
 
+static bool LoadJxlFile(const char* file_path, Image& r_image)
+{
+    size_t in_size = GetFileSize(file_path);
+    if (in_size == 0)
+    {
+        printf("Failed to read JXL %s: file not found\n", file_path);
+        return false;
+    }
+    std::vector<uint8_t> jxl_file(in_size);
+    {
+        MyIStream in_stream(file_path);
+        in_stream.read((char*)jxl_file.data(), int(in_size));
+    }
+    
+    JxlDecoderPtr dec = JxlDecoderMake(nullptr);
+    if (JxlDecoderSubscribeEvents(dec.get(), JXL_DEC_BASIC_INFO | JXL_DEC_FULL_IMAGE) != JXL_DEC_SUCCESS)
+    {
+        printf("Failed to read JXL %s: JxlDecoderSubscribeEvents failed\n", file_path);
+        return false;
+    }
+    if (JxlDecoderSetParallelRunner(dec.get(), JxlThreadParallelRunner, s_jxl_runner.get()) != JXL_DEC_SUCCESS)
+    {
+        printf("Failed to read JXL %s: JxlDecoderSetParallelRunner failed\n", file_path);
+        return false;
+    }
+    
+    JxlDecoderSetInput(dec.get(), jxl_file.data(), jxl_file.size());
+    JxlDecoderCloseInput(dec.get());
+    
+    JxlBasicInfo info = {};
+    JxlPixelFormat base_fmt = {};
+    size_t base_stride = 0;
+    base_fmt.num_channels = 1;
+    Imf::PixelType base_type = Imf::NUM_PIXELTYPES;
+    
+    size_t ch_total_size = 0;
+    std::vector<uint8_t> planar_buffer;
+
+    while (true)
+    {
+        JxlDecoderStatus status = JxlDecoderProcessInput(dec.get());
+
+        if (status == JXL_DEC_ERROR)
+        {
+            printf("Failed to read JXL %s: JxlDecoderProcessInput error\n", file_path);
+            return false;
+        }
+        else if (status == JXL_DEC_NEED_MORE_INPUT)
+        {
+            printf("Failed to read JXL %s: got JXL_DEC_NEED_MORE_INPUT, should not happen\n", file_path);
+            return false;
+        }
+        else if (status == JXL_DEC_BASIC_INFO)
+        {
+            if (JxlDecoderGetBasicInfo(dec.get(), &info) != JXL_DEC_SUCCESS)
+            {
+                printf("Failed to read JXL %s: JxlDecoderGetBasicInfo failed\n", file_path);
+                return false;
+            }
+            r_image.width = info.xsize;
+            r_image.height = info.ysize;
+            if (info.bits_per_sample == 32 && info.exponent_bits_per_sample == 8)
+            {
+                base_fmt.data_type = JXL_TYPE_FLOAT;
+                base_type = Imf::FLOAT;
+                base_stride = 4;
+            }
+            else if (info.bits_per_sample == 16 && info.exponent_bits_per_sample == 5)
+            {
+                base_fmt.data_type = JXL_TYPE_FLOAT16;
+                base_type = Imf::HALF;
+                base_stride = 2;
+            }
+            else
+            {
+                printf("Failed to read JXL %s: unknown base type (bits %i exp %i) failed\n", file_path, info.bits_per_sample, info.exponent_bits_per_sample);
+                return false;
+            }
+            
+            const int num_channels = info.num_color_channels + info.num_extra_channels;
+            
+            if (JxlDecoderImageOutBufferSize(dec.get(), &base_fmt, &ch_total_size) != JXL_DEC_SUCCESS) {
+                printf("Failed to read JXL %s: JxlDecoderImageOutBufferSize failed\n", file_path);
+                return false;
+            }
+            planar_buffer.resize(num_channels * ch_total_size);
+            size_t offset = 0;
+            for (int i = 0; i < info.num_color_channels; ++i)
+            {
+                Image::Channel ch {"Base", base_type, offset};
+                r_image.channels.push_back(ch);
+                offset += base_stride;
+            }
+            for (int i = 0; i < info.num_extra_channels; ++i)
+            {
+                JxlExtraChannelInfo info = {};
+                if (JxlDecoderGetExtraChannelInfo(dec.get(), i, &info) != JXL_DEC_SUCCESS) {
+                    printf("Failed to read JXL %s: JxlDecoderGetExtraChannelInfo failed\n", file_path);
+                    return false;
+                }
+                std::string name;
+                name.resize(info.name_length);
+                if (JxlDecoderGetExtraChannelName(dec.get(), i, name.data(), name.size() + 1) != JXL_DEC_SUCCESS) {
+                    printf("Failed to read JXL %s: JxlDecoderGetExtraChannelName failed\n", file_path);
+                    return false;
+                }
+                Image::Channel ch {name, base_type, offset};
+                r_image.channels.push_back(ch);
+                offset += base_stride;
+            }
+        }
+        else if (status == JXL_DEC_NEED_IMAGE_OUT_BUFFER)
+        {
+            size_t plane_offset = 0;
+            if (JxlDecoderSetImageOutBuffer(dec.get(), &base_fmt, planar_buffer.data() + plane_offset, ch_total_size) != JXL_DEC_SUCCESS)
+            {
+                printf("Failed to read JXL %s: JxlDecoderSetImageOutBuffer failed\n", file_path);
+                return false;
+            }
+            plane_offset += ch_total_size;
+            for (int i = 0; i < info.num_extra_channels; i++)
+            {
+                if (JxlDecoderSetExtraChannelBuffer(dec.get(), &base_fmt, planar_buffer.data() + plane_offset, ch_total_size, i) != JXL_DEC_SUCCESS)
+                {
+                    printf("Failed to read JXL %s: JxlDecoderSetExtraChannelBuffer failed\n", file_path);
+                    return false;
+                }
+                plane_offset += ch_total_size;
+            }
+        }
+        else if (status == JXL_DEC_FULL_IMAGE)
+        {
+            // Nothing to do. Do not yet return. If the image is an animation, more
+            // full frames may be decoded. This example only keeps the last one.
+        }
+        else if (status == JXL_DEC_SUCCESS)
+        {
+            break;
+        }
+        else
+        {
+            printf("Failed to read JXL %s: unknown status %i\n", file_path, status);
+            return false;
+        }
+    }
+    
+    // swizzle data into interleaved layout
+    r_image.pixels.resize(planar_buffer.size());
+    const uint8_t* src_ptr = planar_buffer.data();
+    const size_t pixel_stride = r_image.pixels.size() / r_image.width / r_image.height;
+    for (size_t i = 0; i < r_image.channels.size(); ++i) {
+        const Image::Channel& ch = r_image.channels[i];
+        
+        // put channel data out of plana format into
+        // an interleaved format
+        if (base_stride == 2)
+        {
+            const uint8_t* src = src_ptr;
+            char* dst = r_image.pixels.data() + ch.offset;
+            for (size_t i = 0, n = r_image.width * r_image.height; i != n; ++i)
+            {
+                *(uint16_t*)dst = *(const uint16_t*)src;
+                src += 2;
+                dst += pixel_stride;
+            }
+        }
+        else if (base_stride == 4)
+        {
+            const uint8_t* src = src_ptr;
+            char* dst = r_image.pixels.data() + ch.offset;
+            for (size_t i = 0, n = r_image.width * r_image.height; i != n; ++i)
+            {
+                *(uint32_t*)dst = *(const uint32_t*)src;
+                src += 4;
+                dst += pixel_stride;
+            }
+        }
+        src_ptr += ch_total_size;
+    }
+    
+    return true;
+}
+
+static bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
+{
+    // create encoder
+    JxlEncoderPtr enc = JxlEncoderMake(nullptr);
+    if (JxlEncoderSetParallelRunner(enc.get(), JxlThreadParallelRunner, s_jxl_runner.get()) != JXL_ENC_SUCCESS)
+    {
+        printf("Failed to write JXL %s: JxlEncoderSetParallelRunner failed\n", file_path);
+        return false;
+    }
+    
+    // set basic info
+    //JxlPixelFormat pixel_format = {3, JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0}; //@TODO
+    JxlBasicInfo basic_info;
+    JxlEncoderInitBasicInfo(&basic_info);
+    basic_info.xsize = int(image.width);
+    basic_info.ysize = int(image.height);
+    
+    Imf::PixelType first_ch_type = image.channels.front().type;
+    basic_info.bits_per_sample = first_ch_type == Imf::HALF ? 16 : 32;
+    basic_info.exponent_bits_per_sample = first_ch_type == Imf::HALF ? 5 : (first_ch_type == Imf::FLOAT ? 8 : 0);
+    // JXL has to have 1 or 3 base color channels; we'll assume we use first
+    // one and the rest are "extra"
+    basic_info.num_color_channels = 1;
+    basic_info.num_extra_channels = int(image.channels.size()) - 1;
+    basic_info.uses_original_profile = true;
+    if (JxlEncoderSetBasicInfo(enc.get(), &basic_info) != JXL_ENC_SUCCESS)
+    {
+        printf("Failed to write JXL %s: JxlEncoderSetBasicInfo failed %i\n", file_path, JxlEncoderGetError(enc.get()));
+        return false;
+    }
+    
+    // color encoding
+    JxlColorEncoding color_encoding;
+    JxlColorEncodingSetToLinearSRGB(&color_encoding, true);
+    if (JxlEncoderSetColorEncoding(enc.get(), &color_encoding) != JXL_ENC_SUCCESS)
+    {
+        printf("Failed to write JXL %s: JxlEncoderSetColorEncoding failed\n", file_path);
+        return false;
+    }
+
+    // add other channels as "extra channels"
+    for (size_t i = 1; i < image.channels.size(); ++i) {
+        JxlExtraChannelInfo ec;
+        Imf::PixelType type = image.channels[i].type;
+        JxlEncoderInitExtraChannelInfo(JXL_CHANNEL_OPTIONAL, &ec);
+        ec.bits_per_sample = type == Imf::HALF ? 16 : 32;
+        ec.exponent_bits_per_sample = type == Imf::HALF ? 5 : (type == Imf::FLOAT ? 8 : 0);
+        JxlEncoderSetExtraChannelInfo(enc.get(), i - 1, &ec);
+
+        JxlEncoderSetExtraChannelName(enc.get(), i - 1, image.channels[i].name.c_str(), image.channels[i].name.size());
+    }
+
+    // frame settings
+    JxlEncoderFrameSettings* frame = JxlEncoderFrameSettingsCreate(enc.get(), nullptr);
+    JxlEncoderSetFrameLossless(frame, JXL_TRUE);
+    if (cmp_level != 0)
+        JxlEncoderFrameSettingsSetOption(frame, JXL_ENC_FRAME_SETTING_EFFORT, cmp_level);
+
+    // add image channels as JXL "extra channels"
+    std::vector<char> ch_buffer;
+    const size_t pixel_stride = image.pixels.size() / image.width / image.height;
+    for (size_t i = 0; i < image.channels.size(); ++i) {
+        const Image::Channel& ch = image.channels[i];
+        
+        // put channel data out of interleaved source format into
+        // a planar format
+        const size_t ch_stride = ch.type == Imf::HALF ? 2 : 4;
+        const size_t ch_total_size = image.width * image.height * ch_stride;
+        if (ch_buffer.size() < ch_total_size) {
+            ch_buffer.resize(ch_total_size);
+        }
+        if (ch_stride == 2)
+        {
+            const char* src = image.pixels.data() + ch.offset;
+            char* dst = ch_buffer.data();
+            for (size_t i = 0, n = image.width * image.height; i != n; ++i)
+            {
+                *(uint16_t*)dst = *(const uint16_t*)src;
+                src += pixel_stride;
+                dst += 2;
+            }
+        }
+        else if (ch_stride == 4)
+        {
+            const char* src = image.pixels.data() + ch.offset;
+            char* dst = ch_buffer.data();
+            for (size_t i = 0, n = image.width * image.height; i != n; ++i)
+            {
+                *(uint32_t*)dst = *(const uint32_t*)src;
+                src += pixel_stride;
+                dst += 4;
+            }
+        }
+        JxlPixelFormat fmt = {};
+        fmt.num_channels = 1;
+        fmt.data_type = ch.type == Imf::HALF ? JXL_TYPE_FLOAT16 : (ch.type == Imf::FLOAT ? JXL_TYPE_FLOAT : JXL_TYPE_UINT16); //@TODO: UINT32 not supported by JXL
+        fmt.endianness = JXL_NATIVE_ENDIAN;
+        
+        if (i == 0)
+        {
+            if (JxlEncoderAddImageFrame(frame, &fmt, ch_buffer.data(), ch_total_size) != JXL_ENC_SUCCESS)
+            {
+                printf("Failed to write JXL %s: JxlEncoderAddImageFrame failed\n", file_path);
+                return false;
+            }
+        }
+        else
+        {
+            if (JxlEncoderSetExtraChannelBuffer(frame, &fmt, ch_buffer.data(), ch_total_size, int(i) - 1) != JXL_ENC_SUCCESS)
+            {
+                printf("Failed to write JXL %s: JxlEncoderSetExtraChannelBuffer failed\n", file_path);
+                return false;
+            }
+        }
+    }
+
+    JxlEncoderCloseInput(enc.get());
+
+    // encode into buffer
+    std::vector<uint8_t> compressed;
+    compressed.resize(1024 * 1024);
+    uint8_t* next_out = compressed.data();
+    size_t avail_out = compressed.size();
+    JxlEncoderStatus process_result = JXL_ENC_NEED_MORE_OUTPUT;
+    while (process_result == JXL_ENC_NEED_MORE_OUTPUT)
+    {
+        process_result = JxlEncoderProcessOutput(enc.get(), &next_out, &avail_out);
+        if (process_result == JXL_ENC_NEED_MORE_OUTPUT)
+        {
+          size_t offset = next_out - compressed.data();
+          compressed.resize(compressed.size() * 2);
+          next_out = compressed.data() + offset;
+          avail_out = compressed.size() - offset;
+        }
+    }
+    compressed.resize(next_out - compressed.data());
+    if (process_result != JXL_ENC_SUCCESS)
+    {
+        printf("Failed to write JXL %s: JxlEncoderProcessOutput failed\n", file_path);
+        return false;
+    }
+
+    // write to file
+    FILE* f = fopen(file_path, "wb");
+    fwrite(compressed.data(), 1, next_out - compressed.data(), f);
+    fclose(f);
+
+    return true;
+}
+
+
 static bool TestFile(const char* file_path, int run_index)
 {
     const char* fname_part = strrchr(file_path, '/');
-    printf("%s: ", fname_part ? fname_part+1 : file_path);
+    if (fname_part == nullptr)
+        fname_part = file_path;
+    printf("%s: ", fname_part);
     
     // read the input file
     Image img_in;
@@ -193,22 +552,33 @@ static bool TestFile(const char* file_path, int run_index)
     for (size_t cmp_index = 0; cmp_index < kTestComprCount; ++cmp_index)
     {
         const auto& cmp = kTestCompr[cmp_index];
-        const auto cmp_type = kComprTypes[cmp.type].cmp;
-        const char* out_file_path = "_outfile.exr";
+        const CompressorType cmp_type = kComprTypes[cmp.type].cmp;
+        const char* out_file_path = nullptr;
         double t_write = 0;
         double t_read = 0;
 
         // save the file with given compressor
         auto t_write_0 = time_now();
-        if (cmp_type == Imf::NUM_COMPRESSION_METHODS)
+        if (cmp_type == CompressorType::Raw)
         {
+            out_file_path = "_outfile.raw";
             FILE* f = fopen(out_file_path, "wb");
             TurnOffFileCache(f);
             fwrite(img_in.pixels.data(), img_in.pixels.size(), 1, f);
             fclose(f);
         }
+        else if (cmp_type == CompressorType::Jxl)
+        {
+            out_file_path = "_outfile.jxl";
+            if (!SaveJxlFile(out_file_path, img_in, cmp.level))
+            {
+                printf("ERROR: file could not be saved to JXL %s\n", fname_part);
+                return false;
+            }
+        }
         else
         {
+            out_file_path = "_outfile.exr";
             SaveExrFile(out_file_path, img_in, cmp_type, cmp.level);
         }
         t_write = time_duration_ms(t_write_0) / 1000.0f;
@@ -224,7 +594,7 @@ static bool TestFile(const char* file_path, int run_index)
         // read the file back
         Image img_got;
         auto t_read_0 = time_now();
-        if (cmp_type == Imf::NUM_COMPRESSION_METHODS)
+        if (cmp_type == CompressorType::Raw)
         {
             FILE* f = fopen(out_file_path, "rb");
             TurnOffFileCache(f);
@@ -234,15 +604,87 @@ static bool TestFile(const char* file_path, int run_index)
             fread(img_got.pixels.data(), img_got.pixels.size(), 1, f);
             fclose(f);
         }
+        else if (cmp_type == CompressorType::Jxl)
+        {
+            if (!LoadJxlFile(out_file_path, img_got))
+            {
+                printf("ERROR: file could not be loaded from JXL %s\n", fname_part);
+                return false;
+            }
+        }
         else
         {
             LoadExrFile(out_file_path, img_got);
         }
         t_read = time_duration_ms(t_read_0) / 1000.0f;
         const uint64_t hash_got = rapidhash(img_got.pixels.data(), img_got.pixels.size());
-        if (hash_got != hash_in)
+        // Note: libjxl currently does not seem to round-trip fp16 subnormals
+        // even in full lossless mode, see https://github.com/libjxl/libjxl/issues/3881
+        if (hash_got != hash_in && cmp_type != CompressorType::Jxl)
         {
             printf("ERROR: file did not roundtrip exactly with compression %s\n", kComprTypes[cmp.type].name);
+            if (img_in.pixels.size() != img_got.pixels.size())
+            {
+                printf("- result pixel sizes do not even match: exp %zi got %zi\n", img_in.pixels.size(), img_got.pixels.size());
+            }
+            else
+            {
+                int counter = 0;
+                size_t pixel_stride = img_in.pixels.size() / img_in.width / img_in.height;
+                for (size_t i = 0; i < img_in.pixels.size(); i += pixel_stride)
+                {
+                    if (memcmp(img_in.pixels.data() + i, img_got.pixels.data() + i, pixel_stride) != 0)
+                    {
+                        size_t pix_idx = i / pixel_stride;
+                        printf("- pixel index %zi (%zi,%zi) mismatch:\n", pix_idx, pix_idx % img_got.width, pix_idx / img_got.width);
+                        for (const Image::Channel& ch : img_in.channels)
+                        {
+                            switch(ch.type) {
+                                case Imf::HALF:
+                                {
+                                    const uint16_t vexp = *(const uint16_t*)(img_in.pixels.data() + i + ch.offset);
+                                    const uint16_t vgot = *(const uint16_t*)(img_got.pixels.data() + i + ch.offset);
+                                    if (vexp != vgot)
+                                    {
+                                        printf("  - ch %s mismatch: fp16 exp %i (%f) got %i (%f)\n", ch.name.c_str(),
+                                               vexp, float(half(half::FromBits, vexp)),
+                                               vgot, float(half(half::FromBits, vgot)));
+                                    }
+                                    break;
+                                }
+                                case Imf::FLOAT:
+                                {
+                                    const float vexp = *(const float*)(img_in.pixels.data() + i + ch.offset);
+                                    const float vgot = *(const float*)(img_got.pixels.data() + i + ch.offset);
+                                    if (vexp != vgot)
+                                    {
+                                        printf("  - ch %s mismatch: fp32 exp %f got %f\n", ch.name.c_str(), vexp, vgot);
+                                    }
+                                    break;
+                                }
+                                case Imf::UINT:
+                                {
+                                    const uint32_t vexp = *(const uint32_t*)(img_in.pixels.data() + i + ch.offset);
+                                    const uint32_t vgot = *(const uint32_t*)(img_got.pixels.data() + i + ch.offset);
+                                    if (vexp != vgot)
+                                    {
+                                        printf("  - ch %s mismatch: uint exp %u got %u\n", ch.name.c_str(),
+                                               vexp, vgot);
+                                    }
+                                    break;
+                                }
+                                default:
+                                    break;
+                            }
+                        }
+                        ++counter;
+                        if (counter > 10)
+                            break;
+                    }
+                }
+            }
+            out_file_path = "_outfile.jxl.exr";
+            SaveExrFile(out_file_path, img_got, CompressorType::ExrZIP, 0);
             return false;
         }
 
@@ -412,8 +854,10 @@ int main(int argc, const char** argv)
 #ifdef _DEBUG
     nThreads = 0;
 #endif
-    printf("Setting OpenEXR to %i threads\n", nThreads);
+    printf("Setting EXR/JXL to %i threads\n", nThreads);
     Imf::setGlobalThreadCount(nThreads);
+    s_jxl_runner = JxlThreadParallelRunnerMake(nullptr, nThreads);
+
     for (int ri = 0; ri < kRunCount; ++ri)
     {
         printf("Run %i/%i...\n", ri+1, kRunCount);

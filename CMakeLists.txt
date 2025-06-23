@@ -26,6 +26,32 @@ option(OPENEXR_FORCE_INTERNAL_OPENJPH "" ON)
 option(OPENEXR_FORCE_INTERNAL_IMATH "" ON)
 FetchContent_MakeAvailable(openexr)
 
+# libjxl
+FetchContent_Declare(
+    libjxl
+    GIT_REPOSITORY https://github.com/libjxl/libjxl.git
+    GIT_TAG a75b322e85fd # 2025 Jun, latest at time of writing
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+    GIT_SUBMODULES_RECURSE TRUE
+)
+option(JPEGXL_ENABLE_FUZZERS "" OFF)
+option(JPEGXL_ENABLE_DEVTOOLS "" OFF)
+option(JPEGXL_ENABLE_TOOLS "" OFF)
+option(JPEGXL_ENABLE_JPEGLI "" OFF)
+option(JPEGXL_ENABLE_JPEGLI_LIBJPEG "" OFF)
+option(JPEGXL_ENABLE_DOXYGEN "" OFF)
+option(JPEGXL_ENABLE_MANPAGES "" OFF)
+option(JPEGXL_ENABLE_BENCHMARK "" OFF)
+option(JPEGXL_ENABLE_EXAMPLES "" OFF)
+option(JPEGXL_BUNDLE_LIBPNG "" OFF)
+option(JPEGXL_ENABLE_JNI "" OFF)
+option(JPEGXL_ENABLE_SJPEG "" OFF)
+option(JPEGXL_ENABLE_OPENEXR "" OFF)
+option(JPEGXL_ENABLE_TRANSCODE_JPEG "" OFF)
+FetchContent_MakeAvailable(libjxl)
+
+
 project ("test_exr_htj2k_jxl")
 add_executable (test_exr_htj2k_jxl
     src/main.cpp
@@ -37,6 +63,7 @@ add_executable (test_exr_htj2k_jxl
 )
 target_link_libraries(test_exr_htj2k_jxl PRIVATE
     OpenEXR::OpenEXR
+    jxl_dec-obj jxl_enc-obj jxl_cms jxl_threads brotlidec brotlienc hwy
 )
 set_property(TARGET test_exr_htj2k_jxl PROPERTY CXX_STANDARD 17)
 set_property(TARGET test_exr_htj2k_jxl PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
