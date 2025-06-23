@@ -10,27 +10,11 @@ include(FetchContent)
 
 option(BUILD_SHARED_LIBS "" OFF)
 
-# libdeflate (needed by OpenEXR)
-#FetchContent_Declare(
-#    libdeflate
-#    URL https://github.com/ebiggers/libdeflate/archive/refs/tags/v1.24.zip # latest (2025 May) at time of writing
-#)
-#option(LIBDEFLATE_BUILD_SHARED_LIB "" OFF)
-#option(LIBDEFLATE_BUILD_GZIP "" OFF)
-#FetchContent_MakeAvailable(libdeflate)
-
-# Imath (needed by OpenEXR)
-FetchContent_Declare(
-    imath
-    URL https://github.com/AcademySoftwareFoundation/Imath/archive/refs/tags/v3.1.12.zip # latest (2024 Sep) at time of writing
-)
-option(IMATH_INSTALL "" ON)
-FetchContent_MakeAvailable(imath)
-
 # OpenEXR
 FetchContent_Declare(
 	openexr
-	URL https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/v3.3.4.zip # latest (2025 Jun) at time of writing
+	#URL https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/v3.3.4.zip # latest (2025 Jun) at time of writing
+    URL https://github.com/AcademySoftwareFoundation/openexr/archive/ac31208e9433611003032c0a9f4ebcf050574f41.zip # 2025 May, beta with HTJ2K compression
 )
 option(BUILD_TESTING "" OFF)
 option(OPENEXR_BUILD_TOOLS "" OFF)
@@ -38,6 +22,8 @@ option(OPENEXR_INSTALL "" OFF)
 option(OPENEXR_INSTALL_TOOLS "" OFF)
 option(OPENEXR_BUILD_EXAMPLES "" OFF)
 option(OPENEXR_FORCE_INTERNAL_DEFLATE "" ON)
+option(OPENEXR_FORCE_INTERNAL_OPENJPH "" ON)
+option(OPENEXR_FORCE_INTERNAL_IMATH "" ON)
 FetchContent_MakeAvailable(openexr)
 
 project ("test_exr_htj2k_jxl")

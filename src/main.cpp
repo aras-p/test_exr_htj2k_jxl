@@ -65,7 +65,7 @@ static const CompressorTypeDesc kComprTypes[] =
     {"PIZ",     Imf::PIZ_COMPRESSION,           "ff9a44", 0}, // 3, orange
     {"Zips",    Imf::ZIPS_COMPRESSION,          "046f0e", 0}, // 4, dark green
     {"Zip",     Imf::ZIP_COMPRESSION,           "12b520", 0}, // 5, green
-    //{"Zstd",    Imf::ZSTD_COMPRESSION,          "0094ef", 0}, // 6, blue
+    {"HT256",     Imf::HT256_COMPRESSION,       "0094ef", 0}, // 6, blue
 	//{"ZFP",     Imf::ZFP_COMPRESSION,           "e01010", 1}, // 7, red
 };
 constexpr size_t kComprTypeCount = sizeof(kComprTypes) / sizeof(kComprTypes[0]);
@@ -87,16 +87,14 @@ static const CompressorDesc kTestCompr[] =
     // Zip
 #if 1
     //{ 5, 0 },
-    //{ 5, 1 },
     //{ 5, 2 },
-    //{ 5, 3 },
     { 5, 4 },
-    //{ 5, 5 },
     //{ 5, 6 },
-    //{ 5, 7 },
-    //{ 5, 8 },
     //{ 5, 9 },
 #endif
+
+    // HT256
+    { 6, 0 },
 };
 constexpr size_t kTestComprCount = sizeof(kTestCompr) / sizeof(kTestCompr[0]);
 
@@ -125,9 +123,6 @@ static ComprResult s_Result[kTestComprCount];
 
 static void LoadExrFile(const char* file_path, Image& r_image)
 {
-    const char* fname_part = strrchr(file_path, '/');
-    printf("%s: ", fname_part ? fname_part+1 : file_path);
-
     MyIStream in_stream(file_path);
     Imf::InputFile file(in_stream);
     const Imf::Header& header = file.header();
@@ -145,7 +140,6 @@ static void LoadExrFile(const char* file_path, Image& r_image)
     }
     
     r_image.pixels.resize(r_image.width * r_image.height * offset);
-    printf("%ix%i, %i channels, %i bytes/pixel\n", int(r_image.width), int(r_image.height), int(r_image.channels.size()), int(offset));
     
     Imf::FrameBuffer fb;
     for (const auto& ch : r_image.channels) {
@@ -183,9 +177,13 @@ static void SaveExrFile(const char* file_path, const Image& image, Imf::Compress
 
 static bool TestFile(const char* file_path, int run_index)
 {
+    const char* fname_part = strrchr(file_path, '/');
+    printf("%s: ", fname_part ? fname_part+1 : file_path);
+    
     // read the input file
     Image img_in;
     LoadExrFile(file_path, img_in);
+    printf("%ix%i, %i channels, %i bytes/pixel\n", int(img_in.width), int(img_in.height), int(img_in.channels.size()), int(img_in.pixels.size()/img_in.width/img_in.height));
 
     // compute hash of pixel data
     const size_t raw_size = img_in.pixels.size();
