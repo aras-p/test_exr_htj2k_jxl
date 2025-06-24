@@ -1,7 +1,4 @@
 cmake_minimum_required (VERSION 3.24)
-if(POLICY CMP0091)
-    cmake_policy(SET CMP0091 NEW) # enable MSVC_RUNTIME_LIBRARY
-endif()
 if(POLICY CMP0135)
 	cmake_policy(SET CMP0135 NEW) # avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24+
 endif()
@@ -30,7 +27,7 @@ FetchContent_MakeAvailable(openexr)
 FetchContent_Declare(
     libjxl
     GIT_REPOSITORY https://github.com/libjxl/libjxl.git
-    GIT_TAG a75b322e85fd # 2025 Jun, latest at time of writing
+    GIT_TAG main # 2025 Jun, latest at time of writing
     GIT_SHALLOW TRUE
     GIT_PROGRESS TRUE
     GIT_SUBMODULES_RECURSE TRUE
@@ -51,7 +48,6 @@ option(JPEGXL_ENABLE_OPENEXR "" OFF)
 option(JPEGXL_ENABLE_TRANSCODE_JPEG "" OFF)
 FetchContent_MakeAvailable(libjxl)
 
-
 project ("test_exr_htj2k_jxl")
 add_executable (test_exr_htj2k_jxl
     src/image.h
@@ -71,5 +67,4 @@ target_link_libraries(test_exr_htj2k_jxl PRIVATE
     jxl_dec-obj jxl_enc-obj jxl_cms jxl_threads brotlidec brotlienc hwy
 )
 set_property(TARGET test_exr_htj2k_jxl PROPERTY CXX_STANDARD 17)
-set_property(TARGET test_exr_htj2k_jxl PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 target_compile_definitions(test_exr_htj2k_jxl PRIVATE CRT_SECURE_NO_DEPRECATE _CRT_NONSTDC_NO_WARNINGS NOMINMAX)

@@ -1,0 +1,16 @@
+{
+  "version": "0.2.1",
+  "defaults": {},
+  "configurations": [
+    {
+      "type": "default",
+      "project": "CMakeLists.txt",
+      "projectTarget": "test_exr_htj2k_jxl.exe",
+      "name": "test_exr_htj2k_jxl.exe",
+      "currentDir": "${workspaceRoot}",
+      "args": [
+        "Blender281junkshop_half.exr"
+      ]
+    }
+  ]
+}

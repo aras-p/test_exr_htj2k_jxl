@@ -1,4 +1,6 @@
 /build/*
+/out/*
+/.vs/*
 .DS_Store
 *.html
 *.exr
