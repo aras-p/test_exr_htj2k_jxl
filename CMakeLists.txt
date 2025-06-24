@@ -54,6 +54,11 @@ FetchContent_MakeAvailable(libjxl)
 
 project ("test_exr_htj2k_jxl")
 add_executable (test_exr_htj2k_jxl
+    src/image.h
+    src/image_exr.cpp
+    src/image_exr.h
+    src/image_jxl.cpp
+    src/image_jxl.h
     src/main.cpp
     src/fileio.cpp
     src/fileio.h
