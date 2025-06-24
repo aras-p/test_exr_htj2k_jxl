@@ -67,4 +67,4 @@ target_link_libraries(test_exr_htj2k_jxl PRIVATE
     jxl_dec-obj jxl_enc-obj jxl_cms jxl_threads brotlidec brotlienc hwy
 )
 set_property(TARGET test_exr_htj2k_jxl PROPERTY CXX_STANDARD 17)
-target_compile_definitions(test_exr_htj2k_jxl PRIVATE CRT_SECURE_NO_DEPRECATE _CRT_NONSTDC_NO_WARNINGS NOMINMAX)
+target_compile_definitions(test_exr_htj2k_jxl PRIVATE CRT_SECURE_NO_DEPRECATE _CRT_NONSTDC_NO_WARNINGS NOMINMAX $<$<CONFIG:Debug>:_DEBUG>)

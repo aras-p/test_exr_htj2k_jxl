@@ -9,7 +9,11 @@
       "name": "test_exr_htj2k_jxl.exe",
       "currentDir": "${workspaceRoot}",
       "args": [
-        "Blender281junkshop_half.exr"
+        //"Blender281junkshop_half.exr",
+        //"ph_golden_gate_hills_4k.exr",
+
+        "Blender41splash_many_mixed_channels.exr"//,
+        //"Blender41small.exr"
       ]
     }
   ]

@@ -187,16 +187,19 @@ static bool TestFile(const char* file_path, int run_index)
         }
         t_read = time_duration_ms(t_read_0) / 1000.0f;
         const uint64_t hash_got = rapidhash(img_got.pixels.data(), img_got.pixels.size());
-        // Note: libjxl currently does not seem to round-trip fp16 subnormals
-        // even in full lossless mode, see https://github.com/libjxl/libjxl/issues/3881
-        if (hash_got != hash_in && cmp_type != CompressorType::Jxl)
+        if (hash_got != hash_in)
         {
             printf("ERROR: file did not roundtrip exactly with compression %s\n", kComprTypes[cmp.type].name);
+            SaveExrFile("_outfile.got.exr", img_got, CompressorType::ExrZIP, 0);
             if (img_in.pixels.size() != img_got.pixels.size())
             {
                 printf("- result pixel sizes do not even match: exp %zi got %zi\n", img_in.pixels.size(), img_got.pixels.size());
+                return false;
             }
-            else
+
+            // Note: libjxl currently does not seem to round-trip fp16 subnormals
+            // even in full lossless mode, see https://github.com/libjxl/libjxl/issues/3881
+            if (cmp_type != CompressorType::Jxl)
             {
                 int counter = 0;
                 size_t pixel_stride = img_in.pixels.size() / img_in.width / img_in.height;
@@ -232,10 +235,8 @@ static bool TestFile(const char* file_path, int run_index)
                             break;
                     }
                 }
+                return false;
             }
-            out_file_path = "_outfile.jxl.exr";
-            SaveExrFile(out_file_path, img_got, CompressorType::ExrZIP, 0);
-            return false;
         }
 
         auto& res = s_ResultRuns[cmp_index][run_index];
@@ -401,9 +402,9 @@ int main(int argc, const char** argv)
         return 1;
     }
     unsigned nThreads = std::thread::hardware_concurrency();
-#ifdef _DEBUG
-    nThreads = 0;
-#endif
+//#ifdef _DEBUG
+//    nThreads = 0;
+//#endif
     printf("Setting EXR/JXL to %i threads\n", nThreads);
     InitExr(nThreads);
     InitJxl(nThreads);

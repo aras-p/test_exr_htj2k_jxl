@@ -29,7 +29,7 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
     }
     
     JxlDecoderPtr dec = JxlDecoderMake(nullptr);
-    if (JxlDecoderSubscribeEvents(dec.get(), JXL_DEC_BASIC_INFO | JXL_DEC_FULL_IMAGE) != JXL_DEC_SUCCESS)
+    if (JxlDecoderSubscribeEvents(dec.get(), JXL_DEC_BASIC_INFO | JXL_DEC_FRAME | JXL_DEC_FULL_IMAGE) != JXL_DEC_SUCCESS)
     {
         printf("Failed to read JXL %s: JxlDecoderSubscribeEvents failed\n", file_path);
         return false;
@@ -44,11 +44,6 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
     JxlDecoderCloseInput(dec.get());
     
     JxlBasicInfo info = {};
-    JxlPixelFormat base_fmt = {};
-    size_t base_stride = 0;
-    base_fmt.num_channels = 1;
-    
-    size_t ch_total_size = 0;
     std::vector<uint8_t> planar_buffer;
 
     while (true)
@@ -74,15 +69,22 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
             }
             r_image.width = info.xsize;
             r_image.height = info.ysize;
+
+            if (info.num_color_channels != 1)
+            {
+                printf("Failed to read JXL %s: currently only support 1 base color channel, got %i\n", file_path, info.num_color_channels);
+                return false;
+            }
+
+            JxlPixelFormat base_fmt = {};
+            base_fmt.num_channels = 1;
             if (info.bits_per_sample == 32 && info.exponent_bits_per_sample == 8)
             {
                 base_fmt.data_type = JXL_TYPE_FLOAT;
-                base_stride = 4;
             }
             else if (info.bits_per_sample == 16 && info.exponent_bits_per_sample == 5)
             {
                 base_fmt.data_type = JXL_TYPE_FLOAT16;
-                base_stride = 2;
             }
             else
             {
@@ -92,17 +94,13 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
             
             const int num_channels = info.num_color_channels + info.num_extra_channels;
             
-            if (JxlDecoderImageOutBufferSize(dec.get(), &base_fmt, &ch_total_size) != JXL_DEC_SUCCESS) {
-                printf("Failed to read JXL %s: JxlDecoderImageOutBufferSize failed\n", file_path);
-                return false;
-            }
-            planar_buffer.resize(num_channels * ch_total_size);
             size_t offset = 0;
             for (int i = 0; i < info.num_color_channels; ++i)
             {
-                Image::Channel ch {"Base", base_stride == 2, offset};
+                size_t ch_stride = base_fmt.data_type == JXL_TYPE_FLOAT16 ? 2 : 4;
+                Image::Channel ch {"Base", ch_stride == 2, offset};
                 r_image.channels.push_back(ch);
-                offset += base_stride;
+                offset += ch_stride;
             }
             for (int i = 0; i < info.num_extra_channels; ++i)
             {
@@ -117,15 +115,39 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
                     printf("Failed to read JXL %s: JxlDecoderGetExtraChannelName failed\n", file_path);
                     return false;
                 }
-                Image::Channel ch {name, base_stride == 2, offset};
+                size_t ch_stride = info.bits_per_sample == 16 ? 2 : 4;
+                Image::Channel ch {name, ch_stride == 2, offset};
                 r_image.channels.push_back(ch);
-                offset += base_stride;
+                offset += ch_stride;
+            }
+
+            planar_buffer.resize(r_image.width * r_image.height * offset);
+        }
+        else if (status == JXL_DEC_FRAME)
+        {
+            // Try to reconstruct name of base color channels from JXL "frame name"
+            JxlFrameHeader info = {};
+            if (JxlDecoderGetFrameHeader(dec.get(), &info) != JXL_DEC_SUCCESS) {
+                printf("Failed to read JXL %s: JxlDecoderGetFrameHeader failed\n", file_path);
+                return false;
+            }
+            if (info.name_length > 0 && !r_image.channels.empty())
+            {
+                std::string name;
+                name.resize(info.name_length);
+                if (JxlDecoderGetFrameName(dec.get(), name.data(), name.size() + 1) != JXL_DEC_SUCCESS) {
+                    printf("Failed to read JXL %s: JxlDecoderGetFrameName failed\n", file_path);
+                    return false;
+                }
+                r_image.channels.front().name = name;
             }
         }
         else if (status == JXL_DEC_NEED_IMAGE_OUT_BUFFER)
         {
             size_t plane_offset = 0;
-            if (JxlDecoderSetImageOutBuffer(dec.get(), &base_fmt, planar_buffer.data() + plane_offset, ch_total_size) != JXL_DEC_SUCCESS)
+            JxlPixelFormat ch_fmt = { 1, r_image.channels.front().fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0 };
+            size_t ch_total_size = r_image.width * r_image.height * (ch_fmt.data_type == JXL_TYPE_FLOAT16 ? 2 : 4);
+            if (JxlDecoderSetImageOutBuffer(dec.get(), &ch_fmt, planar_buffer.data() + plane_offset, ch_total_size) != JXL_DEC_SUCCESS)
             {
                 printf("Failed to read JXL %s: JxlDecoderSetImageOutBuffer failed\n", file_path);
                 return false;
@@ -133,7 +155,9 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
             plane_offset += ch_total_size;
             for (int i = 0; i < info.num_extra_channels; i++)
             {
-                if (JxlDecoderSetExtraChannelBuffer(dec.get(), &base_fmt, planar_buffer.data() + plane_offset, ch_total_size, i) != JXL_DEC_SUCCESS)
+                ch_fmt.data_type = r_image.channels[i + 1].fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT;
+                ch_total_size = r_image.width * r_image.height * (ch_fmt.data_type == JXL_TYPE_FLOAT16 ? 2 : 4);
+                if (JxlDecoderSetExtraChannelBuffer(dec.get(), &ch_fmt, planar_buffer.data() + plane_offset, ch_total_size, i) != JXL_DEC_SUCCESS)
                 {
                     printf("Failed to read JXL %s: JxlDecoderSetExtraChannelBuffer failed\n", file_path);
                     return false;
@@ -166,7 +190,7 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
         
         // put channel data out of plana format into
         // an interleaved format
-        if (base_stride == 2)
+        if (ch.fp16)
         {
             const uint8_t* src = src_ptr;
             char* dst = r_image.pixels.data() + ch.offset;
@@ -177,7 +201,7 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
                 dst += pixel_stride;
             }
         }
-        else if (base_stride == 4)
+        else
         {
             const uint8_t* src = src_ptr;
             char* dst = r_image.pixels.data() + ch.offset;
@@ -188,7 +212,7 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
                 dst += pixel_stride;
             }
         }
-        src_ptr += ch_total_size;
+        src_ptr += r_image.width * r_image.height * (ch.fp16 ? 2 : 4);
     }
     
     return true;
@@ -205,15 +229,14 @@ bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
     }
     
     // set basic info
-    //JxlPixelFormat pixel_format = {3, JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0}; //@TODO
     JxlBasicInfo basic_info;
     JxlEncoderInitBasicInfo(&basic_info);
     basic_info.xsize = int(image.width);
     basic_info.ysize = int(image.height);
     
-    const bool first_ch_fp16 = image.channels.front().fp16;
-    basic_info.bits_per_sample = first_ch_fp16 ? 16 : 32;
-    basic_info.exponent_bits_per_sample = first_ch_fp16 ? 5 : 8;
+    bool fp16 = image.channels.front().fp16;
+    basic_info.bits_per_sample = fp16 ? 16 : 32;
+    basic_info.exponent_bits_per_sample = fp16 ? 5 : 8;
     // JXL has to have 1 or 3 base color channels; we'll assume we use first
     // one and the rest are "extra"
     basic_info.num_color_channels = 1;
@@ -248,6 +271,7 @@ bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
 
     // frame settings
     JxlEncoderFrameSettings* frame = JxlEncoderFrameSettingsCreate(enc.get(), nullptr);
+    JxlEncoderSetFrameName(frame, image.channels.front().name.c_str()); // JXL does not store names of base color channels, so store it as "frame name"
     JxlEncoderSetFrameLossless(frame, JXL_TRUE);
     if (cmp_level != 0)
         JxlEncoderFrameSettingsSetOption(frame, JXL_ENC_FRAME_SETTING_EFFORT, cmp_level);
