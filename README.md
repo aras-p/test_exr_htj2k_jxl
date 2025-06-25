@@ -25,11 +25,10 @@ Note that here I am only comparing the *lossless* compression modes. Lossy compr
 Here's compression ratio (horizontal axis) vs performance (MB/s) charts; the more to the upper right corner the result is, the better. A chart
 on Mac (M4 Max), using clang compiler from Xcode 16:
 
-[img/mac-m4max-20250625.png](img/mac-m4max-20250625.html)
+![](/img/mac-m4max-20250625.png?raw=true)
 
-I also have [one for Windows](img/win-ryzen5950x-20250625.html) (Ryzen 5950X, using Visual Studio 2022 v17.14). Overall shape is the same, except everything is 2x-3x slower;
+Results on Windows (Ryzen 5950X, using Visual Studio 2022 v17.14) overall are similar shape, except everything is 2x-3x slower;
 partially due to compiler, partially due to CPU, partially due to M4 Max having *crazy high* memory bandwidth.
-
 
 ### Notes
 
