@@ -65,8 +65,8 @@ static const CompressorDesc kTestCompr[] =
     // EXR
 #if 1
     { 1, 0 }, // None
-    { 2, 0 }, // RLE
-    { 3, 0 }, // PIZ
+    //{ 2, 0 }, // RLE
+    //{ 3, 0 }, // PIZ
     //{ 4, 2 },
     { 4, 4 }, // ZIP default
     //{ 4, 6 },
@@ -76,10 +76,10 @@ static const CompressorDesc kTestCompr[] =
     
     // JXL
 #if 1
-    //{ 6, 1 },
-    { 6, 3 },
+    { 6, 1 },
+    //{ 6, 3 },
     //{ 6, 5 },
-    //{ 6, 0 }, // default level 7
+    { 6, 0 }, // default level 7
     //{ 6, 9 },
 #endif
 };
@@ -114,7 +114,7 @@ static bool TestFile(const char* file_path, int run_index)
     // even in full lossless mode, see https://github.com/libjxl/libjxl/issues/3881
     SanitizePixelValues(img_in);
 
-    printf("%ix%i, %i channels, %i bytes/pixel\n", int(img_in.width), int(img_in.height), int(img_in.channels.size()), int(img_in.pixels.size()/img_in.width/img_in.height));
+    printf("%ix%i, %i channels, %i bytes/pixel (%.1fMB)\n", int(img_in.width), int(img_in.height), int(img_in.channels.size()), int(img_in.pixels.size()/img_in.width/img_in.height), img_in.pixels.size()/1024.0/1024.0);
     const size_t raw_size = img_in.pixels.size();
     
     // test various compression schemes
@@ -313,8 +313,8 @@ R"(var options = {
     }
     fprintf(fout,
 R"(        100:{}},
-    hAxis: {title: 'Compression ratio', viewWindow: {min:1.0,max:4.0}},
-    vAxis: {title: 'Writing, MB/s', viewWindow: {min:0, max:10000}},
+    hAxis: {title: 'Compression ratio', viewWindow: {min:1.0,max:3.0}},
+    vAxis: {title: 'Writing, MB/s', viewWindow: {min:0, max:7000}},
     chartArea: {left:60, right:10, top:50, bottom:50},
     legend: {position: 'top'},
     colors: [
@@ -339,7 +339,7 @@ chw.draw(dw, options);
 
 options.title = 'Reading';
 options.vAxis.title = 'Reading, MB/s';
-options.vAxis.viewWindow.max = 10000;
+options.vAxis.viewWindow.max = 7000;
 var chr = new google.visualization.ScatterChart(document.getElementById('chart_r'));
 chr.draw(dr, options);
 }

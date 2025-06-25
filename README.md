@@ -9,8 +9,12 @@ Obtained through cmake `FetchContent`:
 
 Uploaded separately, in order to not blow up Git repo size and/or my Github LFS billing:
 
-- [Blender281junkshop_half.exr](https://aras-p.info/files/exr_files/Blender281junkshop_half.exr) - 4K res RGBA, FP16, 28MB.
-- [Blender41splash_many_mixed_channels.exr](https://aras-p.info/files/exr_files/Blender41splash_many_mixed_channels.exr) - 4K res, many channels (colors, normals, depth etc.),
-  mixed FP16 and FP32, 403MB.
-- [ph_golden_gate_hills_4k.exr](https://aras-p.info/files/exr_files/ph_golden_gate_hills_4k.exr) - 4096x2048 HDRI from [polyhaven](https://polyhaven.com/a/golden_gate_hills), RGBA, FP32, 92MB.
-
+| File | Resolution | Raw size | Notes |
+|------|-----------:|---------:|-------|
+|[Blender281.exr](https://aras-p.info/files/exr_files/Blender281.exr) 	| 3840x2160 |  63.3MB | RGBA half |
+|[Blender35.exr](https://aras-p.info/files/exr_files/Blender35.exr) 	| 3840x2160 | 332.2MB | 18 channels, mixed half/float |
+|[Blender40.exr](https://aras-p.info/files/exr_files/Blender40.exr) 	| 3840x2160 | 348.0MB | 15 channels, mixed half/float |
+|[Blender41.exr](https://aras-p.info/files/exr_files/Blender41.exr) 	| 3840x2160 | 743.6MB | 37 channels, mixed half/float |
+|[Blender43.exr](https://aras-p.info/files/exr_files/Blender43.exr) 	| 3840x2160 |  47.5MB | RGB half |
+|[ph_brown_photostudio_02_8k.exr](https://aras-p.info/files/exr_files/ph_brown_photostudio_02_8k.exr) | 8192x4096 | 384.0MB | RGB float, from [polyhaven](https://polyhaven.com/a/brown_photostudio_02) |
+|[ph_golden_gate_hills_4k.exr](https://aras-p.info/files/exr_files/ph_golden_gate_hills_4k.exr) | 4096x2048 | 128.0MB | RGBA float, from [polyhaven](https://polyhaven.com/a/golden_gate_hills) |
