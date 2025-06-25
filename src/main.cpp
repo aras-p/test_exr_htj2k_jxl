@@ -5,8 +5,6 @@
 #include <stdlib.h>
 #include <chrono>
 
-#include "rapidhash/rapidhash.h"
-
 #ifndef _MSC_VER
 #include <sys/fcntl.h>
 #endif
@@ -111,11 +109,13 @@ static bool TestFile(const char* file_path, int run_index)
         printf("ERROR: failed to load EXR file\n");
         return false;
     }
-    printf("%ix%i, %i channels, %i bytes/pixel\n", int(img_in.width), int(img_in.height), int(img_in.channels.size()), int(img_in.pixels.size()/img_in.width/img_in.height));
+    
+    // Note: libjxl currently does not seem to round-trip fp16 subnormals
+    // even in full lossless mode, see https://github.com/libjxl/libjxl/issues/3881
+    SanitizePixelValues(img_in);
 
-    // compute hash of pixel data
+    printf("%ix%i, %i channels, %i bytes/pixel\n", int(img_in.width), int(img_in.height), int(img_in.channels.size()), int(img_in.pixels.size()/img_in.width/img_in.height));
     const size_t raw_size = img_in.pixels.size();
-    const uint64_t hash_in = rapidhash(img_in.pixels.data(), img_in.pixels.size());
     
     // test various compression schemes
     for (size_t cmp_index = 0; cmp_index < kTestComprCount; ++cmp_index)
@@ -186,57 +186,11 @@ static bool TestFile(const char* file_path, int run_index)
             LoadExrFile(out_file_path, img_got);
         }
         t_read = time_duration_ms(t_read_0) / 1000.0f;
-        const uint64_t hash_got = rapidhash(img_got.pixels.data(), img_got.pixels.size());
-        if (hash_got != hash_in)
+        if (!CompareImages(img_in, img_got))
         {
             printf("ERROR: file did not roundtrip exactly with compression %s\n", kComprTypes[cmp.type].name);
             SaveExrFile("_outfile.got.exr", img_got, CompressorType::ExrZIP, 0);
-            if (img_in.pixels.size() != img_got.pixels.size())
-            {
-                printf("- result pixel sizes do not even match: exp %zi got %zi\n", img_in.pixels.size(), img_got.pixels.size());
-                return false;
-            }
-
-            // Note: libjxl currently does not seem to round-trip fp16 subnormals
-            // even in full lossless mode, see https://github.com/libjxl/libjxl/issues/3881
-            if (cmp_type != CompressorType::Jxl)
-            {
-                int counter = 0;
-                size_t pixel_stride = img_in.pixels.size() / img_in.width / img_in.height;
-                for (size_t i = 0; i < img_in.pixels.size(); i += pixel_stride)
-                {
-                    if (memcmp(img_in.pixels.data() + i, img_got.pixels.data() + i, pixel_stride) != 0)
-                    {
-                        size_t pix_idx = i / pixel_stride;
-                        printf("- pixel index %zi (%zi,%zi) mismatch:\n", pix_idx, pix_idx % img_got.width, pix_idx / img_got.width);
-                        for (const Image::Channel& ch : img_in.channels)
-                        {
-                            if (ch.fp16)
-                            {
-                                const uint16_t vexp = *(const uint16_t*)(img_in.pixels.data() + i + ch.offset);
-                                const uint16_t vgot = *(const uint16_t*)(img_got.pixels.data() + i + ch.offset);
-                                if (vexp != vgot)
-                                {
-                                    printf("  - ch %s mismatch: fp16 exp %i got %i\n", ch.name.c_str(), vexp, vgot);
-                                }
-                            }
-                            else
-                            {
-                                const float vexp = *(const float*)(img_in.pixels.data() + i + ch.offset);
-                                const float vgot = *(const float*)(img_got.pixels.data() + i + ch.offset);
-                                if (vexp != vgot)
-                                {
-                                    printf("  - ch %s mismatch: fp32 exp %f got %f\n", ch.name.c_str(), vexp, vgot);
-                                }
-                            }
-                        }
-                        ++counter;
-                        if (counter > 10)
-                            break;
-                    }
-                }
-                return false;
-            }
+            return false;
         }
 
         auto& res = s_ResultRuns[cmp_index][run_index];

@@ -1,10 +1,9 @@
 ### External software
 
-- Vendored:
-  - `src/rapidhash` - https://github.com/Nicoshev/rapidhash 1370c3f (2025 Jun)
-- Obtained through cmake FetchContent:
-  - [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) - 2025 May, beta branch with HTJ2K support
-  - [libjxl](https://github.com/libjxl/libjxl) - 2025 Jun, rev a75b322e
+Obtained through cmake `FetchContent`:
+
+- [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) - 2025 May, beta branch with HTJ2K support
+- [libjxl](https://github.com/libjxl/libjxl) - 2025 Jun, rev a75b322e
 
 ### Files I am testing on
 

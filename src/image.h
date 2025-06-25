@@ -27,3 +27,5 @@ struct Image
     std::vector<char> pixels;
 };
 
+void SanitizePixelValues(Image& image);
+bool CompareImages(const Image& ia, const Image& ib);
