@@ -302,7 +302,7 @@ R"(var options = {
     fprintf(fout,
 R"(        100:{}},
     hAxis: {title: 'Compression ratio', viewWindow: {min:1.0,max:3.0}},
-    vAxis: {title: 'Writing, MB/s', viewWindow: {min:0, max:4000}},
+    vAxis: {title: 'Writing, MB/s', viewWindow: {min:0, max:6250}},
     chartArea: {left:60, right:10, top:50, bottom:50},
     legend: {position: 'top'},
     colors: [
@@ -327,7 +327,7 @@ chw.draw(dw, options);
 
 options.title = 'Reading';
 options.vAxis.title = 'Reading, MB/s';
-options.vAxis.viewWindow.max = 4000;
+options.vAxis.viewWindow.max = 6250;
 var chr = new google.visualization.ScatterChart(document.getElementById('chart_r'));
 chr.draw(dr, options);
 }

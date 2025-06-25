@@ -90,10 +90,3 @@ void MyOStream::seekp (uint64_t pos)
     }
     _pos = pos;
 }
-
-size_t GetFileSize(const char* path)
-{
-    struct stat st = {};
-    stat(path, &st);
-    return st.st_size;
-}

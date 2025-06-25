@@ -5,7 +5,7 @@
 <div id='chart_w' style='width: 640px; height: 640px; display:inline-block;'></div>
 <div id='chart_r' style='width: 640px; height: 640px; display:inline-block;'></div>
 </div>
-<p>Windows, AMD Ryzen 9 5950X 16-Core Processor            , 32 threads</p>
+<p>macOS, Apple M4 Max, 16 threads</p>
 <script type='text/javascript'>
 google.charts.load('current', {'packages':['corechart']});
 google.charts.setOnLoadCallback(drawChart);
@@ -25,22 +25,22 @@ dr.addColumn('number', 'HT256'); dr.addColumn({type:'string', role:'tooltip'});
 dw.addColumn('number', 'JXL'); dw.addColumn({type:'string', role:'tooltip'});
 dr.addColumn('number', 'JXL'); dr.addColumn({type:'string', role:'tooltip'});
 dw.addRows([
-[1.200,1808.46,'RLE: 1.200 ratio, 1808.5 MB/s',null,null,null,null,null,null,null,null],
-[1.977,null,null,1012.31,'PIZ: 1.977 ratio, 1012.3 MB/s',null,null,null,null,null,null],
-[2.189,null,null,null,null,1293.42,'Zip4: 2.189 ratio, 1293.4 MB/s',null,null,null,null],
-[1.959,null,null,null,null,null,null,796.49,'HT256: 1.959 ratio, 796.5 MB/s',null,null],
-[2.036,null,null,null,null,null,null,null,null,224.80,'JXL1: 2.036 ratio, 224.8 MB/s'],
-[2.248,null,null,null,null,null,null,null,null,138.30,'JXL4: 2.248 ratio, 138.3 MB/s'],
-[2.407,null,null,null,null,null,null,null,null,52.19,'JXL7: 2.407 ratio, 52.2 MB/s']
+[1.200,3682.97,'RLE: 1.200 ratio, 3683.0 MB/s',null,null,null,null,null,null,null,null],
+[1.977,null,null,2162.64,'PIZ: 1.977 ratio, 2162.6 MB/s',null,null,null,null,null,null],
+[2.189,null,null,null,null,1892.74,'Zip4: 2.189 ratio, 1892.7 MB/s',null,null,null,null],
+[1.959,null,null,null,null,null,null,1565.81,'HT256: 1.959 ratio, 1565.8 MB/s',null,null],
+[2.036,null,null,null,null,null,null,null,null,653.77,'JXL1: 2.036 ratio, 653.8 MB/s'],
+[2.248,null,null,null,null,null,null,null,null,306.89,'JXL4: 2.248 ratio, 306.9 MB/s'],
+[2.417,null,null,null,null,null,null,null,null,87.33,'JXL7: 2.417 ratio, 87.3 MB/s']
 ]);
 dr.addRows([
-[1.200,3074.43,'RLE: 1.200 ratio, 3074.4 MB/s',null,null,null,null,null,null,null,null],
-[1.977,null,null,1547.43,'PIZ: 1.977 ratio, 1547.4 MB/s',null,null,null,null,null,null],
-[2.189,null,null,null,null,2039.59,'Zip4: 2.189 ratio, 2039.6 MB/s',null,null,null,null],
-[1.959,null,null,null,null,null,null,974.48,'HT256: 1.959 ratio, 974.5 MB/s',null,null],
-[2.036,null,null,null,null,null,null,null,null,406.62,'JXL1: 2.036 ratio, 406.6 MB/s'],
-[2.248,null,null,null,null,null,null,null,null,338.08,'JXL4: 2.248 ratio, 338.1 MB/s'],
-[2.407,null,null,null,null,null,null,null,null,286.37,'JXL7: 2.407 ratio, 286.4 MB/s']
+[1.200,6084.01,'RLE: 1.200 ratio, 6084.0 MB/s',null,null,null,null,null,null,null,null],
+[1.977,null,null,3649.69,'PIZ: 1.977 ratio, 3649.7 MB/s',null,null,null,null,null,null],
+[2.189,null,null,null,null,5217.43,'Zip4: 2.189 ratio, 5217.4 MB/s',null,null,null,null],
+[1.959,null,null,null,null,null,null,2399.58,'HT256: 1.959 ratio, 2399.6 MB/s',null,null],
+[2.036,null,null,null,null,null,null,null,null,1186.69,'JXL1: 2.036 ratio, 1186.7 MB/s'],
+[2.248,null,null,null,null,null,null,null,null,837.35,'JXL4: 2.248 ratio, 837.4 MB/s'],
+[2.417,null,null,null,null,null,null,null,null,580.17,'JXL7: 2.417 ratio, 580.2 MB/s']
 ]);
 var options = {
     title: 'Writing',
