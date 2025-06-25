@@ -5,9 +5,6 @@
 #include <stdlib.h>
 #include <chrono>
 
-#ifndef _MSC_VER
-#include <sys/fcntl.h>
-#endif
 #include <thread>
 #include "systeminfo.h"
 #include "fileio.h"
@@ -18,7 +15,7 @@
 #ifdef _DEBUG
 const int kRunCount = 1;
 #else
-const int kRunCount = 4;
+const int kRunCount = 3;
 #endif
 
 inline std::chrono::high_resolution_clock::time_point time_now()
@@ -42,13 +39,13 @@ struct CompressorTypeDesc
 
 static const CompressorTypeDesc kComprTypes[] =
 {
-    {"Raw",     CompressorType::Raw,        "a64436", 1}, // 0 - just raw bits read/write
-    {"None",    CompressorType::ExrNone,    "a64436", 1}, // 1, red
+    {"Raw",     CompressorType::Raw,        "a64436", 0}, // 0 - just raw bits read/write
+    {"None",    CompressorType::ExrNone,    "a64436", 0}, // 1, red
     {"RLE",     CompressorType::ExrRLE,     "dc74ff", 0}, // 2, purple
     {"PIZ",     CompressorType::ExrPIZ,     "ff9a44", 0}, // 3, orange
     {"Zip",     CompressorType::ExrZIP,     "12b520", 0}, // 4, green
     {"HT256",   CompressorType::ExrHT256,   "0094ef", 0}, // 5, blue
-	{"JXL",     CompressorType::Jxl,        "e01010", 1}, // 6, red
+	{"JXL",     CompressorType::Jxl,        "e01010", 0}, // 6, red
 };
 constexpr size_t kComprTypeCount = sizeof(kComprTypes) / sizeof(kComprTypes[0]);
 
@@ -64,22 +61,23 @@ static const CompressorDesc kTestCompr[] =
     
     // EXR
 #if 1
-    { 1, 0 }, // None
-    //{ 2, 0 }, // RLE
-    //{ 3, 0 }, // PIZ
+    //{ 1, 0 }, // None
+    { 2, 0 }, // RLE
+    { 3, 0 }, // PIZ
+
     //{ 4, 2 },
     { 4, 4 }, // ZIP default
     //{ 4, 6 },
     //{ 4, 9 },
+
     { 5, 0 }, // HT256
 #endif
     
     // JXL
 #if 1
     { 6, 1 },
-    //{ 6, 3 },
-    //{ 6, 5 },
-    { 6, 0 }, // default level 7
+    { 6, 4 },
+    { 6, 7 }, // default level 7
     //{ 6, 9 },
 #endif
 };
@@ -104,10 +102,13 @@ static bool TestFile(const char* file_path, int run_index)
     
     // read the input file
     Image img_in;
-    if (!LoadExrFile(file_path, img_in))
     {
-        printf("ERROR: failed to load EXR file\n");
-        return false;
+        MyIStream mem_in(file_path);
+        if (!LoadExrFile(mem_in, img_in))
+        {
+            printf("ERROR: failed to load EXR file %s\n", file_path);
+            return false;
+        }
     }
     
     // Note: libjxl currently does not seem to round-trip fp16 subnormals
@@ -122,24 +123,19 @@ static bool TestFile(const char* file_path, int run_index)
     {
         const auto& cmp = kTestCompr[cmp_index];
         const CompressorType cmp_type = kComprTypes[cmp.type].cmp;
-        const char* out_file_path = nullptr;
         double t_write = 0;
         double t_read = 0;
 
         // save the file with given compressor
         auto t_write_0 = time_now();
+        MyOStream mem_out;
         if (cmp_type == CompressorType::Raw)
         {
-            out_file_path = "_outfile.raw";
-            FILE* f = fopen(out_file_path, "wb");
-            TurnOffFileCache(f);
-            fwrite(img_in.pixels.data(), img_in.pixels.size(), 1, f);
-            fclose(f);
+            mem_out.write(img_in.pixels.data(), (int)img_in.pixels.size());
         }
         else if (cmp_type == CompressorType::Jxl)
         {
-            out_file_path = "_outfile.jxl";
-            if (!SaveJxlFile(out_file_path, img_in, cmp.level))
+            if (!SaveJxlFile(mem_out, img_in, cmp.level))
             {
                 printf("ERROR: file could not be saved to JXL %s\n", fname_part);
                 return false;
@@ -147,35 +143,25 @@ static bool TestFile(const char* file_path, int run_index)
         }
         else
         {
-            out_file_path = "_outfile.exr";
-            SaveExrFile(out_file_path, img_in, cmp_type, cmp.level);
+            SaveExrFile(mem_out, img_in, cmp_type, cmp.level);
         }
         t_write = time_duration_ms(t_write_0) / 1000.0f;
-        size_t out_size = GetFileSize(out_file_path);
-        
-        // purge filesystem caches
-#ifndef _MSC_VER
-        int purgeVal = system("purge");
-        if (purgeVal != 0)
-            printf("WARN: failed to purge I/O caches, perhaps you need to run under `sudo`\n");
-#endif
+        size_t out_size = mem_out.size();
         
         // read the file back
         Image img_got;
         auto t_read_0 = time_now();
+        MyIStream mem_got_in(mem_out.data(), mem_out.size());
         if (cmp_type == CompressorType::Raw)
         {
-            FILE* f = fopen(out_file_path, "rb");
-            TurnOffFileCache(f);
             img_got.width = img_in.width;
             img_got.height = img_in.height;
             img_got.pixels.resize(img_in.pixels.size());
-            fread(img_got.pixels.data(), img_got.pixels.size(), 1, f);
-            fclose(f);
+            memcpy(img_got.pixels.data(), mem_got_in.data(), img_got.pixels.size());
         }
         else if (cmp_type == CompressorType::Jxl)
         {
-            if (!LoadJxlFile(out_file_path, img_got))
+            if (!LoadJxlFile(mem_got_in, img_got))
             {
                 printf("ERROR: file could not be loaded from JXL %s\n", fname_part);
                 return false;
@@ -183,13 +169,17 @@ static bool TestFile(const char* file_path, int run_index)
         }
         else
         {
-            LoadExrFile(out_file_path, img_got);
+            if (!LoadExrFile(mem_got_in, img_got))
+            {
+                printf("ERROR: file could not be loaded from EXR %s\n", fname_part);
+                return false;
+            }
         }
         t_read = time_duration_ms(t_read_0) / 1000.0f;
         if (!CompareImages(img_in, img_got))
         {
             printf("ERROR: file did not roundtrip exactly with compression %s\n", kComprTypes[cmp.type].name);
-            SaveExrFile("_outfile.got.exr", img_got, CompressorType::ExrZIP, 0);
+            //SaveExrFile("_outfile.got.exr", img_got, CompressorType::ExrZIP, 0);
             return false;
         }
 
@@ -198,8 +188,6 @@ static bool TestFile(const char* file_path, int run_index)
         res.cmpSize += out_size;
         res.tRead += t_read;
         res.tWrite += t_write;
-        
-        remove(out_file_path);
     }
     
     return true;
@@ -314,7 +302,7 @@ R"(var options = {
     fprintf(fout,
 R"(        100:{}},
     hAxis: {title: 'Compression ratio', viewWindow: {min:1.0,max:3.0}},
-    vAxis: {title: 'Writing, MB/s', viewWindow: {min:0, max:7000}},
+    vAxis: {title: 'Writing, MB/s', viewWindow: {min:0, max:4000}},
     chartArea: {left:60, right:10, top:50, bottom:50},
     legend: {position: 'top'},
     colors: [
@@ -339,7 +327,7 @@ chw.draw(dw, options);
 
 options.title = 'Reading';
 options.vAxis.title = 'Reading, MB/s';
-options.vAxis.viewWindow.max = 7000;
+options.vAxis.viewWindow.max = 4000;
 var chr = new google.visualization.ScatterChart(document.getElementById('chart_r'));
 chr.draw(dr, options);
 }

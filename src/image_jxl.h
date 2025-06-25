@@ -1,10 +1,11 @@
 #pragma once
 
 #include "image.h"
+#include "fileio.h"
 
 void InitJxl(int thread_count);
-bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level);
-bool LoadJxlFile(const char* file_path, Image& r_image);
+bool SaveJxlFile(MyOStream& mem, const Image& image, int cmp_level);
+bool LoadJxlFile(MyIStream &mem, Image& r_image);
 
 
 

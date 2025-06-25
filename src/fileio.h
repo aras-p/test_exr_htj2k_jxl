@@ -1,48 +1,43 @@
 #pragma once
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
+#include <vector>
 #include "ImfIO.h"
-#ifdef _MSC_VER
-#include <wtypes.h>
-#endif
-
-size_t GetFileSize(const char* path);
-
-void TurnOffFileCache(FILE* f);
 
 class MyIStream : public Imf::IStream
 {
 public:
     MyIStream(const char* fileName);
+    MyIStream(const char* buffer, size_t size)
+        : IStream("<mem>"), _buffer(buffer), _pos(0), _size(size), _owns_buffer(false) {}
     ~MyIStream();
-    virtual bool read(char c[/*n*/], int n);
+    virtual bool read(char c[], int n);
     virtual uint64_t tellg();
     virtual void seekg(uint64_t pos);
     virtual void clear();
+
+    const char* data() const { return _buffer; }
+    size_t size() const { return _size; }
 private:
-#ifdef _MSC_VER
-    char* _buffer;
+    const char* _buffer;
 	size_t _pos;
     size_t _size;
-#else
-    FILE* _file;
-#endif
+    bool _owns_buffer = false;
 };
+
 class MyOStream : public Imf::OStream
 {
 public:
-    MyOStream(const char* fileName);
-    ~MyOStream();
+    MyOStream();
+    ~MyOStream() {}
+
     virtual void write(const char c[/*n*/], int n);
     virtual uint64_t tellp();
     virtual void seekp(uint64_t pos);
+
+    const char* data() const { return _buffer.data(); }
+    size_t size() const { return _buffer.size(); }
 private:
-#ifdef _MSC_VER
-    char* _buffer;
-    size_t _size;
+    std::vector<char> _buffer;
     size_t _pos;
-    HANDLE _file;
-#else
-    FILE* _file;
-#endif
 };

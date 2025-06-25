@@ -2,6 +2,6 @@
 /out/*
 /.vs/*
 .DS_Store
-*.html
+/*.html
 *.exr
 *.jxl

@@ -2,10 +2,8 @@
 #include <jxl/encode_cxx.h>
 #include <jxl/color_encoding.h>
 #include <jxl/thread_parallel_runner_cxx.h>
-#include <jxl/resizable_parallel_runner_cxx.h>
 
 #include "image_jxl.h"
-#include "fileio.h"
 
 static JxlThreadParallelRunnerPtr s_jxl_runner;
 
@@ -14,33 +12,21 @@ void InitJxl(int thread_count)
     s_jxl_runner = JxlThreadParallelRunnerMake(nullptr, thread_count);
 }
 
-bool LoadJxlFile(const char* file_path, Image& r_image)
-{
-    size_t in_size = GetFileSize(file_path);
-    if (in_size == 0)
-    {
-        printf("Failed to read JXL %s: file not found\n", file_path);
-        return false;
-    }
-    std::vector<uint8_t> jxl_file(in_size);
-    {
-        MyIStream in_stream(file_path);
-        in_stream.read((char*)jxl_file.data(), int(in_size));
-    }
-    
+bool LoadJxlFile(MyIStream &mem, Image& r_image)
+{    
     JxlDecoderPtr dec = JxlDecoderMake(nullptr);
     if (JxlDecoderSubscribeEvents(dec.get(), JXL_DEC_BASIC_INFO | JXL_DEC_FRAME | JXL_DEC_FULL_IMAGE) != JXL_DEC_SUCCESS)
     {
-        printf("Failed to read JXL %s: JxlDecoderSubscribeEvents failed\n", file_path);
+        printf("Failed to read JXL: JxlDecoderSubscribeEvents failed\n");
         return false;
     }
     if (JxlDecoderSetParallelRunner(dec.get(), JxlThreadParallelRunner, s_jxl_runner.get()) != JXL_DEC_SUCCESS)
     {
-        printf("Failed to read JXL %s: JxlDecoderSetParallelRunner failed\n", file_path);
+        printf("Failed to read JXL: JxlDecoderSetParallelRunner failed\n");
         return false;
     }
     
-    JxlDecoderSetInput(dec.get(), jxl_file.data(), jxl_file.size());
+    JxlDecoderSetInput(dec.get(), (const uint8_t*)mem.data(), mem.size());
     JxlDecoderCloseInput(dec.get());
     
     JxlBasicInfo info = {};
@@ -52,19 +38,19 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
 
         if (status == JXL_DEC_ERROR)
         {
-            printf("Failed to read JXL %s: JxlDecoderProcessInput error\n", file_path);
+            printf("Failed to read JXL: JxlDecoderProcessInput error\n");
             return false;
         }
         else if (status == JXL_DEC_NEED_MORE_INPUT)
         {
-            printf("Failed to read JXL %s: got JXL_DEC_NEED_MORE_INPUT, should not happen\n", file_path);
+            printf("Failed to read JXL: got JXL_DEC_NEED_MORE_INPUT, should not happen\n");
             return false;
         }
         else if (status == JXL_DEC_BASIC_INFO)
         {
             if (JxlDecoderGetBasicInfo(dec.get(), &info) != JXL_DEC_SUCCESS)
             {
-                printf("Failed to read JXL %s: JxlDecoderGetBasicInfo failed\n", file_path);
+                printf("Failed to read JXL: JxlDecoderGetBasicInfo failed\n");
                 return false;
             }
             r_image.width = info.xsize;
@@ -82,7 +68,7 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
             }
             else
             {
-                printf("Failed to read JXL %s: unknown base type (bits %i exp %i) failed\n", file_path, info.bits_per_sample, info.exponent_bits_per_sample);
+                printf("Failed to read JXL: unknown base type (bits %i exp %i) failed\n", info.bits_per_sample, info.exponent_bits_per_sample);
                 return false;
             }
             
@@ -100,13 +86,13 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
             {
                 JxlExtraChannelInfo info = {};
                 if (JxlDecoderGetExtraChannelInfo(dec.get(), i, &info) != JXL_DEC_SUCCESS) {
-                    printf("Failed to read JXL %s: JxlDecoderGetExtraChannelInfo failed\n", file_path);
+                    printf("Failed to read JXL: JxlDecoderGetExtraChannelInfo failed\n");
                     return false;
                 }
                 std::string name;
                 name.resize(info.name_length);
                 if (JxlDecoderGetExtraChannelName(dec.get(), i, name.data(), name.size() + 1) != JXL_DEC_SUCCESS) {
-                    printf("Failed to read JXL %s: JxlDecoderGetExtraChannelName failed\n", file_path);
+                    printf("Failed to read JXL: JxlDecoderGetExtraChannelName failed\n");
                     return false;
                 }
                 size_t ch_stride = info.bits_per_sample == 16 ? 2 : 4;
@@ -122,7 +108,7 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
             // Try to reconstruct name of base color channels from JXL "frame name"
             JxlFrameHeader frame_info = {};
             if (JxlDecoderGetFrameHeader(dec.get(), &frame_info) != JXL_DEC_SUCCESS) {
-                printf("Failed to read JXL %s: JxlDecoderGetFrameHeader failed\n", file_path);
+                printf("Failed to read JXL: JxlDecoderGetFrameHeader failed\n");
                 return false;
             }
             if (frame_info.name_length > 0 && r_image.channels.size() >= info.num_color_channels)
@@ -130,7 +116,7 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
                 std::string name;
                 name.resize(frame_info.name_length);
                 if (JxlDecoderGetFrameName(dec.get(), name.data(), name.size() + 1) != JXL_DEC_SUCCESS) {
-                    printf("Failed to read JXL %s: JxlDecoderGetFrameName failed\n", file_path);
+                    printf("Failed to read JXL: JxlDecoderGetFrameName failed\n");
                     return false;
                 }
                 if (info.num_color_channels == 1)
@@ -157,7 +143,7 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
             size_t ch_total_size = r_image.width * r_image.height * (ch_fmt.data_type == JXL_TYPE_FLOAT16 ? 2 : 4) * ch_fmt.num_channels;
             if (JxlDecoderSetImageOutBuffer(dec.get(), &ch_fmt, planar_buffer.data() + plane_offset, ch_total_size) != JXL_DEC_SUCCESS)
             {
-                printf("Failed to read JXL %s: JxlDecoderSetImageOutBuffer failed\n", file_path);
+                printf("Failed to read JXL: JxlDecoderSetImageOutBuffer failed\n");
                 return false;
             }
             plane_offset += ch_total_size;
@@ -168,7 +154,7 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
                 ch_total_size = r_image.width * r_image.height * (ch_fmt.data_type == JXL_TYPE_FLOAT16 ? 2 : 4) * ch_fmt.num_channels;
                 if (JxlDecoderSetExtraChannelBuffer(dec.get(), &ch_fmt, planar_buffer.data() + plane_offset, ch_total_size, i) != JXL_DEC_SUCCESS)
                 {
-                    printf("Failed to read JXL %s: JxlDecoderSetExtraChannelBuffer failed\n", file_path);
+                    printf("Failed to read JXL: JxlDecoderSetExtraChannelBuffer failed\n");
                     return false;
                 }
                 plane_offset += ch_total_size;
@@ -185,7 +171,7 @@ bool LoadJxlFile(const char* file_path, Image& r_image)
         }
         else
         {
-            printf("Failed to read JXL %s: unknown status %i\n", file_path, status);
+            printf("Failed to read JXL: unknown status %i\n", status);
             return false;
         }
     }
@@ -279,13 +265,13 @@ static RGBAChannels FindImageRGBAChannels(const Image& image)
     return rgba;
 }
 
-bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
+bool SaveJxlFile(MyOStream& mem, const Image& image, int cmp_level)
 {
     // create encoder
     JxlEncoderPtr enc = JxlEncoderMake(nullptr);
     if (JxlEncoderSetParallelRunner(enc.get(), JxlThreadParallelRunner, s_jxl_runner.get()) != JXL_ENC_SUCCESS)
     {
-        printf("Failed to write JXL %s: JxlEncoderSetParallelRunner failed\n", file_path);
+        printf("Failed to write JXL: JxlEncoderSetParallelRunner failed\n");
         return false;
     }
     
@@ -322,7 +308,7 @@ bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
     }
     if (JxlEncoderSetBasicInfo(enc.get(), &basic_info) != JXL_ENC_SUCCESS)
     {
-        printf("Failed to write JXL %s: JxlEncoderSetBasicInfo failed %i\n", file_path, JxlEncoderGetError(enc.get()));
+        printf("Failed to write JXL: JxlEncoderSetBasicInfo failed %i\n", JxlEncoderGetError(enc.get()));
         return false;
     }
     
@@ -331,7 +317,7 @@ bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
     JxlColorEncodingSetToLinearSRGB(&color_encoding, use_rgb ? false : true);
     if (JxlEncoderSetColorEncoding(enc.get(), &color_encoding) != JXL_ENC_SUCCESS)
     {
-        printf("Failed to write JXL %s: JxlEncoderSetColorEncoding failed\n", file_path);
+        printf("Failed to write JXL: JxlEncoderSetColorEncoding failed\n");
         return false;
     }
 
@@ -420,7 +406,7 @@ bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
         JxlPixelFormat fmt = {4, fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0};
         if (JxlEncoderAddImageFrame(frame, &fmt, ch_buffer.data(), ch_total_size) != JXL_ENC_SUCCESS)
         {
-            printf("Failed to write JXL %s: JxlEncoderAddImageFrame RGBA failed\n", file_path);
+            printf("Failed to write JXL: JxlEncoderAddImageFrame RGBA failed\n");
             return false;
         }
     }
@@ -462,7 +448,7 @@ bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
         JxlPixelFormat fmt = { 3, fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0 };
         if (JxlEncoderAddImageFrame(frame, &fmt, ch_buffer.data(), ch_total_size) != JXL_ENC_SUCCESS)
         {
-            printf("Failed to write JXL %s: JxlEncoderAddImageFrame RGB failed\n", file_path);
+            printf("Failed to write JXL: JxlEncoderAddImageFrame RGB failed\n");
             return false;
         }
     }
@@ -514,7 +500,7 @@ bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
         {
             if (JxlEncoderAddImageFrame(frame, &fmt, ch_buffer.data(), ch_total_size) != JXL_ENC_SUCCESS)
             {
-                printf("Failed to write JXL %s: JxlEncoderAddImageFrame failed\n", file_path);
+                printf("Failed to write JXL: JxlEncoderAddImageFrame failed\n");
                 return false;
             }
         }
@@ -522,7 +508,7 @@ bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
         {
             if (JxlEncoderSetExtraChannelBuffer(frame, &fmt, ch_buffer.data(), ch_total_size, extra_ch_idx) != JXL_ENC_SUCCESS)
             {
-                printf("Failed to write JXL %s: JxlEncoderSetExtraChannelBuffer failed\n", file_path);
+                printf("Failed to write JXL: JxlEncoderSetExtraChannelBuffer failed\n");
                 return false;
             }
             ++extra_ch_idx;
@@ -551,14 +537,11 @@ bool SaveJxlFile(const char* file_path, const Image& image, int cmp_level)
     compressed.resize(next_out - compressed.data());
     if (process_result != JXL_ENC_SUCCESS)
     {
-        printf("Failed to write JXL %s: JxlEncoderProcessOutput failed\n", file_path);
+        printf("Failed to write JXL: JxlEncoderProcessOutput failed\n");
         return false;
     }
 
-    // write to file
-    FILE* f = fopen(file_path, "wb");
-    fwrite(compressed.data(), 1, next_out - compressed.data(), f);
-    fclose(f);
-
+    // output
+    mem.write((const char*)compressed.data(), next_out - compressed.data());
     return true;
 }

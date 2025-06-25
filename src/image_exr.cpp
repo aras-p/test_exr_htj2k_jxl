@@ -12,10 +12,9 @@ void InitExr(int thread_count)
     Imf::setGlobalThreadCount(thread_count);
 }
 
-bool LoadExrFile(const char* file_path, Image& r_image)
+bool LoadExrFile(MyIStream &mem, Image& r_image)
 {
-    MyIStream in_stream(file_path);
-    Imf::InputFile file(in_stream);
+    Imf::InputFile file(mem);
     const Imf::Header& header = file.header();
     const Imf::ChannelList& channels = header.channels();
     Imath::Box2i dw = header.dataWindow();
@@ -42,12 +41,13 @@ bool LoadExrFile(const char* file_path, Image& r_image)
         char *ptr = r_image.pixels.data() + ch.offset - dw.min.x * offset - dw.min.y * offset * r_image.width;
         fb.insert(ch.name, Imf::Slice(ch.fp16 ? Imf::HALF : Imf::FLOAT, ptr, offset, offset * r_image.width));
     }
+
     file.setFrameBuffer(fb);
     file.readPixels(dw.min.y, dw.max.y);
     return true;
 }
 
-void SaveExrFile(const char* file_path, const Image& image, CompressorType cmp_type, int cmp_level)
+void SaveExrFile(MyOStream &mem, const Image& image, CompressorType cmp_type, int cmp_level)
 {
     Imf::Compression compression = Imf::NUM_COMPRESSION_METHODS;
     switch (cmp_type) {
@@ -76,8 +76,7 @@ void SaveExrFile(const char* file_path, const Image& image, CompressorType cmp_t
         fb.insert(ch.name, Imf::Slice(ch.fp16 ? Imf::HALF : Imf::FLOAT, (char*)ptr, stride, stride * image.width));
     }
 
-    MyOStream out_stream(file_path);
-    Imf::OutputFile file(out_stream, header);
+    Imf::OutputFile file(mem, header);
     file.setFrameBuffer(fb);
     file.writePixels(int(image.height));
 }
