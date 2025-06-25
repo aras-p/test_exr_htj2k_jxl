@@ -55,7 +55,7 @@ void SaveExrFile(const char* file_path, const Image& image, CompressorType cmp_t
         case CompressorType::ExrRLE: compression = Imf::RLE_COMPRESSION; break;
         case CompressorType::ExrPIZ: compression = Imf::PIZ_COMPRESSION; break;
         case CompressorType::ExrZIP: compression = Imf::ZIP_COMPRESSION; break;
-        case CompressorType::ExrHT256: compression = Imf::HT256_COMPRESSION; break;
+        case CompressorType::ExrHT256: compression = Imf::HTJ2K_COMPRESSION; break;
         default: break;
     }
     
