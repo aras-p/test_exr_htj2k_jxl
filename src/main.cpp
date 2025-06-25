@@ -228,7 +228,7 @@ static void WriteReportFile(int threadCount, int fileCount, size_t fullSize)
     fprintf(fout,
 R"(<script type='text/javascript' src='https://www.gstatic.com/charts/loader.js'></script>
 <center style='font-family: Arial;'>
-<p><b>EXR compression ratio vs throughput</b>, %i files (%.1fMB) <span style='color: #ccc'>%s, %i runs</span</p>
+<p><b>EXR/JXL compression ratio vs throughput</b>, %i files (%.1fMB) <span style='color: #ccc'>%s, %i runs</span</p>
 <div style='border: 1px solid #ccc;'>
 <div id='chart_w' style='width: 640px; height: 640px; display:inline-block;'></div>
 <div id='chart_r' style='width: 640px; height: 640px; display:inline-block;'></div>
