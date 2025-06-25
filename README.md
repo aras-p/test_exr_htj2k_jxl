@@ -32,6 +32,8 @@ partially due to compiler, partially due to CPU, partially due to M4 Max having 
 
 ### Notes
 
+- I am building `Release` cmake config on both `OpenEXR` and `libjxl` libraries, as well as any dependencies they pull in.
+- I am setting up multi-threading via `Imf::setGlobalThreadCount()` for OpenEXR, and `JxlThreadParallelRunner` for libjxl.
 - At least on *this* data set, OpenEXR with regular ZIP compression seems best.
 - Upcoming HT256 compression in OpenEXR on this data is both *worse compression* than ZIP, and *worse performance* :(
 	- Note that I am testing OpenEXR with [PR#2061](https://github.com/AcademySoftwareFoundation/openexr/pull/2061) applied;
