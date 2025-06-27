@@ -3,22 +3,22 @@
 void SanitizePixelValues(Image& image)
 {
     const size_t pixel_stride = image.pixels.size() / image.width / image.height;
-    for (const Image::Channel& ch : image.channels)
+    const char* ptr = image.pixels.data();
+    for (size_t i = 0, n = image.width * image.height; i != n; ++i)
     {
-        if (ch.fp16)
+        for (const Image::Channel& ch : image.channels)
         {
-            const char* ptr = image.pixels.data() + ch.offset;
-            for (size_t i = 0, n = image.width * image.height; i != n; ++i)
+            if (ch.fp16)
             {
-                uint16_t val = *(const uint16_t*)ptr;
+                uint16_t* pix = (uint16_t*)(ptr + ch.offset);
+                uint16_t val = *pix;
                 if (val < 1024 || (val >= 32769 && val <= 33791)) // subnormal
                 {
-                    val = 0;
-                    *(uint16_t*)ptr = val;
+                    *pix = 0;
                 }
-                ptr += pixel_stride;
             }
         }
+        ptr += pixel_stride;
     }
 }
 
@@ -37,13 +37,14 @@ bool CompareImages(const Image& ia, const Image& ib)
     }
     
     // see if we have matching channels, note that we support different channel orderings
-    const size_t pixel_stride = ia.pixels.size() / ia.width / ia.height;
-    bool ok = true;
-    for (const Image::Channel& cha : ia.channels)
+    std::vector<size_t> ch_atob(ia.channels.size());
+    for (size_t idxa = 0; idxa < ia.channels.size(); ++idxa)
     {
-        int offsetb = -1;
-        for (const Image::Channel& chb : ib.channels)
+        const Image::Channel& cha = ia.channels[idxa];
+        bool found = false;
+        for (size_t idxb = 0; idxb < ib.channels.size(); ++idxb)
         {
+            const Image::Channel& chb = ib.channels[idxb];
             if (cha.name == chb.name)
             {
                 if (cha.fp16 != chb.fp16)
@@ -51,54 +52,55 @@ bool CompareImages(const Image& ia, const Image& ib)
                     printf("ERROR: image channel '%s' type mismatch: exp fp16=%i, got %i\n", cha.name.c_str(), cha.fp16, chb.fp16);
                     return false;
                 }
-                offsetb = int(chb.offset);
+                found = true;
+                ch_atob[idxa] = idxb;
                 break;
             }
         }
-        if (offsetb < 0)
+        if (!found)
         {
             printf("ERROR: image channel '%s' not found in 2nd image\n", cha.name.c_str());
             return false;
         }
-        
-        // compare pixel values
-        const char* srca = ia.pixels.data() + cha.offset;
-        const char* srcb = ib.pixels.data() + offsetb;
-        int error_count = 0;
-        if (cha.fp16)
-        {
-            for (size_t i = 0, n = ia.width * ia.height; i != n; ++i)
-            {
-                const uint16_t va = *(const uint16_t*)srca;
-                const uint16_t vb = *(const uint16_t*)srcb;
-                if (va != vb)
-                {
-                    ok = false;
-                    ++error_count;
-                    if (error_count < 5)
-                        printf("  - ch %s mismatch: pixel %zi,%zi fp16 exp %i got %i\n", cha.name.c_str(), i%ia.width, i%ia.width, va, vb);
-                }
-                srca += pixel_stride;
-                srcb += pixel_stride;
-            }
-        }
-        else
-        {
-            for (size_t i = 0, n = ia.width * ia.height; i != n; ++i)
-            {
-                const float va = *(const float*)srca;
-                const float vb = *(const float*)srcb;
-                if (va != vb)
-                {
-                    ok = false;
-                    ++error_count;
-                    if (error_count < 5)
-                        printf("  - ch %s mismatch: pixel %zi,%zi fp32 exp %f got %f\n", cha.name.c_str(), i%ia.width, i%ia.width, va, vb);
-                }
-                srca += pixel_stride;
-                srcb += pixel_stride;
-            }
-        }
     }
-    return ok;
+
+    // compare pixel values
+    const size_t pixel_stride = ia.pixels.size() / ia.width / ia.height;
+    const char* ptra = ia.pixels.data();
+    const char* ptrb = ib.pixels.data();
+    int error_count = 0;
+    for (size_t i = 0, n = ia.width * ia.height; i != n; ++i)
+    {
+        for (size_t cidxa = 0; cidxa < ia.channels.size(); ++cidxa)
+        {
+            const Image::Channel& cha = ia.channels[cidxa];
+            const Image::Channel& chb = ib.channels[ch_atob[cidxa]];
+            if (cha.fp16)
+            {
+                const uint16_t va = *(const uint16_t*)(ptra + cha.offset);
+                const uint16_t vb = *(const uint16_t*)(ptrb + chb.offset);
+                if (va != vb)
+                {
+                    ++error_count;
+                    if (error_count < 10)
+                        printf("  - ch %s mismatch: pixel %zi,%zi fp16 exp %i got %i\n", cha.name.c_str(), i % ia.width, i % ia.width, va, vb);
+                }
+            }
+            else
+            {
+                const float va = *(const float*)(ptra + cha.offset);
+                const float vb = *(const float*)(ptrb + chb.offset);
+                if (va != vb)
+                {
+                    ++error_count;
+                    if (error_count < 10)
+                        printf("  - ch %s mismatch: pixel %zi,%zi fp32 exp %f got %f\n", cha.name.c_str(), i % ia.width, i % ia.width, va, vb);
+                }
+            }
+        }
+        ptra += pixel_stride;
+        ptrb += pixel_stride;
+    }
+
+    return error_count == 0;
 }
