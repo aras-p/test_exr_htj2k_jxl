@@ -30,7 +30,9 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
     JxlDecoderCloseInput(dec.get());
     
     JxlBasicInfo info = {};
-    std::vector<uint8_t> planar_buffer;
+    // not a vector to avoid zero-initialization of the whole buffer
+    size_t planar_buffer_size = 0;
+    std::unique_ptr<uint8_t[]> planar_buffer;
 
     while (true)
     {
@@ -101,7 +103,8 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
                 offset += ch_stride;
             }
 
-            planar_buffer.resize(r_image.width * r_image.height * offset);
+            planar_buffer_size = r_image.width * r_image.height * offset;
+            planar_buffer = std::make_unique<uint8_t[]>(planar_buffer_size);
         }
         else if (status == JXL_DEC_FRAME)
         {
@@ -141,7 +144,7 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
             size_t plane_offset = 0;
             JxlPixelFormat ch_fmt = { info.num_color_channels, r_image.channels.front().fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0 };
             size_t ch_total_size = r_image.width * r_image.height * (ch_fmt.data_type == JXL_TYPE_FLOAT16 ? 2 : 4) * ch_fmt.num_channels;
-            if (JxlDecoderSetImageOutBuffer(dec.get(), &ch_fmt, planar_buffer.data() + plane_offset, ch_total_size) != JXL_DEC_SUCCESS)
+            if (JxlDecoderSetImageOutBuffer(dec.get(), &ch_fmt, planar_buffer.get() + plane_offset, ch_total_size) != JXL_DEC_SUCCESS)
             {
                 printf("Failed to read JXL: JxlDecoderSetImageOutBuffer failed\n");
                 return false;
@@ -152,7 +155,7 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
                 ch_fmt.num_channels = 1;
                 ch_fmt.data_type = r_image.channels[i + info.num_color_channels].fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT;
                 ch_total_size = r_image.width * r_image.height * (ch_fmt.data_type == JXL_TYPE_FLOAT16 ? 2 : 4) * ch_fmt.num_channels;
-                if (JxlDecoderSetExtraChannelBuffer(dec.get(), &ch_fmt, planar_buffer.data() + plane_offset, ch_total_size, i) != JXL_DEC_SUCCESS)
+                if (JxlDecoderSetExtraChannelBuffer(dec.get(), &ch_fmt, planar_buffer.get() + plane_offset, ch_total_size, i) != JXL_DEC_SUCCESS)
                 {
                     printf("Failed to read JXL: JxlDecoderSetExtraChannelBuffer failed\n");
                     return false;
@@ -176,52 +179,34 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
         }
     }
     
-    // swizzle data into interleaved layout
-    r_image.pixels.resize(planar_buffer.size());
-    const uint8_t* src_ptr = planar_buffer.data();
+    // Swizzle data into interleaved layout. Note that especially for large
+    // images, it seems to be much faster to do the loop by linearly writing
+    // into destination, with scattered reads (i.e. order is "for all pixels,
+    // for all channels") than it is to do linear reads, scattered writes
+    // ("for all channels, for all pixels").
+    r_image.pixels.resize(planar_buffer_size);
+    const uint8_t* src_ptr = planar_buffer.get();
     const size_t pixel_stride = r_image.pixels.size() / r_image.width / r_image.height;
-    // base color channels
+    char* dst_ptr = r_image.pixels.data();
+
+    const size_t color_ch_stride = info.num_color_channels * (r_image.channels[0].fp16 ? 2 : 4);
+    const uint8_t* src_col_ptr = src_ptr;
+    const size_t pixel_count = r_image.width * r_image.height;
+    for (size_t i = 0, n = r_image.width * r_image.height; i != n; ++i)
     {
-        const Image::Channel& ch = r_image.channels[0];
-        const size_t pix_size = info.num_color_channels * (ch.fp16 ? 2 : 4);
-        const uint8_t* src = src_ptr;
-        char* dst = r_image.pixels.data();
-        for (size_t i = 0, n = r_image.width * r_image.height; i != n; ++i)
+        // base color channels
+        memcpy(dst_ptr, src_col_ptr, color_ch_stride);
+        dst_ptr += color_ch_stride;
+        src_col_ptr += color_ch_stride;
+
+        // extra channels
+        for (size_t ich = info.num_color_channels, nch = r_image.channels.size(); ich != nch; ++ich)
         {
-            memcpy(dst, src, pix_size);
-            src += pix_size;
-            dst += pixel_stride;
+            const size_t ch_size = r_image.channels[ich].fp16 ? 2 : 4;
+            const size_t ch_offset = r_image.channels[ich].offset;
+            memcpy(dst_ptr, src_ptr + ch_offset * pixel_count + i * ch_size, ch_size);
+            dst_ptr += ch_size;
         }
-        src_ptr += r_image.width * r_image.height * pix_size;
-    }
-    // the rest of channels
-    for (size_t i = info.num_color_channels; i < r_image.channels.size(); ++i)
-    {
-        const Image::Channel& ch = r_image.channels[i];
-        
-        if (ch.fp16)
-        {
-            const uint8_t* src = src_ptr;
-            char* dst = r_image.pixels.data() + ch.offset;
-            for (size_t i = 0, n = r_image.width * r_image.height; i != n; ++i)
-            {
-                *(uint16_t*)dst = *(const uint16_t*)src;
-                src += 2;
-                dst += pixel_stride;
-            }
-        }
-        else
-        {
-            const uint8_t* src = src_ptr;
-            char* dst = r_image.pixels.data() + ch.offset;
-            for (size_t i = 0, n = r_image.width * r_image.height; i != n; ++i)
-            {
-                *(uint32_t*)dst = *(const uint32_t*)src;
-                src += 4;
-                dst += pixel_stride;
-            }
-        }
-        src_ptr += r_image.width * r_image.height * (ch.fp16 ? 2 : 4);
     }
     
     return true;
