@@ -30,6 +30,9 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
     JxlDecoderCloseInput(dec.get());
     
     JxlBasicInfo info = {};
+    bool has_alpha = false;
+    int extra_non_alpha_channels = 0;
+    int rgba_channels = 0;
     // not a vector to avoid zero-initialization of the whole buffer
     size_t total_buffer_size = 0;
     std::unique_ptr<uint8_t[]> planar_buffer;
@@ -84,27 +87,31 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
             }
             for (int i = 0; i < info.num_extra_channels; ++i)
             {
-                JxlExtraChannelInfo info = {};
-                if (JxlDecoderGetExtraChannelInfo(dec.get(), i, &info) != JXL_DEC_SUCCESS) {
+                JxlExtraChannelInfo ch_info = {};
+                if (JxlDecoderGetExtraChannelInfo(dec.get(), i, &ch_info) != JXL_DEC_SUCCESS) {
                     printf("Failed to read JXL: JxlDecoderGetExtraChannelInfo failed\n");
                     return false;
                 }
+                has_alpha = info.alpha_bits > 0 && i == 0 && ch_info.type == JXL_CHANNEL_ALPHA;
+
                 std::string name;
-                name.resize(info.name_length);
+                name.resize(ch_info.name_length);
                 if (JxlDecoderGetExtraChannelName(dec.get(), i, name.data(), name.size() + 1) != JXL_DEC_SUCCESS) {
                     printf("Failed to read JXL: JxlDecoderGetExtraChannelName failed\n");
                     return false;
                 }
-                size_t ch_stride = info.bits_per_sample == 16 ? 2 : 4;
+                size_t ch_stride = ch_info.bits_per_sample == 16 ? 2 : 4;
                 Image::Channel ch {name, ch_stride == 2, offset};
                 r_image.channels.push_back(ch);
                 offset += ch_stride;
             }
+            extra_non_alpha_channels = info.num_extra_channels - (has_alpha ? 1 : 0);
+            rgba_channels = info.num_color_channels + (has_alpha ? 1 : 0);
 
-            // Try to avoid the de-swizzle and extra memory overhead if we only have color channels and no extra channels:
+            // Try to avoid the de-swizzle and extra memory overhead if we only have RGB(A) channels:
             // we can decode directly into destination.
             total_buffer_size = r_image.width * r_image.height * offset;
-            if (info.num_extra_channels == 0)
+            if (extra_non_alpha_channels == 0)
             {
                 r_image.pixels.resize(total_buffer_size);
             }
@@ -148,15 +155,15 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
         }
         else if (status == JXL_DEC_NEED_IMAGE_OUT_BUFFER)
         {
-            JxlPixelFormat ch_fmt = { info.num_color_channels, r_image.channels.front().fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0 };
+            JxlPixelFormat ch_fmt = { rgba_channels, r_image.channels.front().fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0};
             size_t ch_total_size = r_image.width * r_image.height * (ch_fmt.data_type == JXL_TYPE_FLOAT16 ? 2 : 4) * ch_fmt.num_channels;
-            if (JxlDecoderSetImageOutBuffer(dec.get(), &ch_fmt, info.num_extra_channels == 0 ? (uint8_t*)r_image.pixels.data() : planar_buffer.get(), ch_total_size) != JXL_DEC_SUCCESS)
+            if (JxlDecoderSetImageOutBuffer(dec.get(), &ch_fmt, extra_non_alpha_channels == 0 ? (uint8_t*)r_image.pixels.data() : planar_buffer.get(), ch_total_size) != JXL_DEC_SUCCESS)
             {
                 printf("Failed to read JXL: JxlDecoderSetImageOutBuffer failed\n");
                 return false;
             }
             size_t plane_offset = ch_total_size;
-            for (int i = 0; i < info.num_extra_channels; i++)
+            for (int i = has_alpha ? 1 : 0; i < info.num_extra_channels; i++)
             {
                 ch_fmt.num_channels = 1;
                 ch_fmt.data_type = r_image.channels[i + info.num_color_channels].fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT;
@@ -185,7 +192,7 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
         }
     }
 
-    if (info.num_extra_channels != 0)
+    if (extra_non_alpha_channels != 0)
     {
         // Swizzle data into interleaved layout. Note that especially for large
         // images, it seems to be much faster to do the loop by linearly writing
@@ -197,7 +204,7 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
         const size_t pixel_stride = r_image.pixels.size() / r_image.width / r_image.height;
         char* dst_ptr = r_image.pixels.data();
 
-        const size_t color_ch_stride = info.num_color_channels * (r_image.channels[0].fp16 ? 2 : 4);
+        const size_t color_ch_stride = rgba_channels * (r_image.channels[0].fp16 ? 2 : 4);
         const uint8_t* src_col_ptr = src_ptr;
         const size_t pixel_count = r_image.width * r_image.height;
         for (size_t i = 0, n = r_image.width * r_image.height; i != n; ++i)
@@ -208,7 +215,7 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
             src_col_ptr += color_ch_stride;
 
             // extra channels
-            for (size_t ich = info.num_color_channels, nch = r_image.channels.size(); ich != nch; ++ich)
+            for (size_t ich = rgba_channels, nch = r_image.channels.size(); ich != nch; ++ich)
             {
                 const size_t ch_size = r_image.channels[ich].fp16 ? 2 : 4;
                 const size_t ch_offset = r_image.channels[ich].offset;
