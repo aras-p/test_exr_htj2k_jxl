@@ -155,7 +155,7 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
         }
         else if (status == JXL_DEC_NEED_IMAGE_OUT_BUFFER)
         {
-            JxlPixelFormat ch_fmt = { rgba_channels, r_image.channels.front().fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0};
+            JxlPixelFormat ch_fmt = { uint32_t(rgba_channels), r_image.channels.front().fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0};
             size_t ch_total_size = r_image.width * r_image.height * (ch_fmt.data_type == JXL_TYPE_FLOAT16 ? 2 : 4) * ch_fmt.num_channels;
             if (JxlDecoderSetImageOutBuffer(dec.get(), &ch_fmt, extra_non_alpha_channels == 0 ? (uint8_t*)r_image.pixels.data() : planar_buffer.get(), ch_total_size) != JXL_DEC_SUCCESS)
             {
