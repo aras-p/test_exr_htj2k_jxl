@@ -42,12 +42,12 @@ static const CompressorTypeDesc kComprTypes[] =
 {
     {"Raw",     CompressorType::Raw,        "a64436", 0}, // 0 - just raw bits read/write
     {"None",    CompressorType::ExrNone,    "a64436", 0}, // 1, red
-    {"RLE",     CompressorType::ExrRLE,     "dc74ff", 0}, // 2, purple
+    {"RLE",     CompressorType::ExrRLE,     "6080a0", 0}, // 2, gray-ish
     {"PIZ",     CompressorType::ExrPIZ,     "ff9a44", 0}, // 3, orange
     {"Zip",     CompressorType::ExrZIP,     "12b520", 0}, // 4, green
     {"HT256",   CompressorType::ExrHT256,   "0094ef", 0}, // 5, blue
 	{"JXL",     CompressorType::Jxl,        "e01010", 0}, // 6, red
-    {"Mop",     CompressorType::Mop,        "808080", 0}, // 7, gray
+    {"Mop",     CompressorType::Mop,        "ac74d0", 0}, // 7, magenta-ish
 };
 constexpr size_t kComprTypeCount = sizeof(kComprTypes) / sizeof(kComprTypes[0]);
 
@@ -73,11 +73,13 @@ static const CompressorDesc kTestCompr[] =
     //{ 4, 9 },
 
     { 5, 0 }, // HT256
-#endif
+#endif 
     
     // JXL
 #if 1
     { 6, 1 },
+    { 6, 2 },
+    { 6, 3 },
     { 6, 4 },
     { 6, 7 }, // default level 7
     //{ 6, 9 },
@@ -85,7 +87,10 @@ static const CompressorDesc kTestCompr[] =
 
     // Mop
 #if 1
+    { 7, 0 },
+    { 7, 1 },
     { 7, 2 }, // default level 2
+    { 7, 3 },
 #endif
 };
 constexpr size_t kTestComprCount = sizeof(kTestCompr) / sizeof(kTestCompr[0]);
@@ -233,7 +238,7 @@ static void WriteReportRow(FILE* fout, uint64_t gotTypeMask, size_t cmpIndex, do
         fprintf(fout, ",null,null");
     }
     fprintf(fout, ",%.2f,'", yval);
-    if (cmpLevel != 0)
+    if (cmpLevel != 0 || typeIndex == (int)CompressorType::Mop)
         fprintf(fout, "%s%i", cmpName, cmpLevel);
     else
         fprintf(fout, "%s", cmpName);

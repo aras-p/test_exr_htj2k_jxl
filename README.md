@@ -55,7 +55,10 @@ Uploaded separately, in order to not blow up Git repo size and/or my Github LFS 
 
 | File | Resolution | Raw size | Notes |
 |------|-----------:|---------:|-------|
-|[Blender281.exr](https://aras-p.info/files/exr_files/Blender281.exr) 	| 3840x2160 |  63.3MB | RGBA half |
+|[Blender281rgb16.exr](https://aras-p.info/files/exr_files/Blender281rgb16.exr) 	| 3840x2160 |  47.5MB | RGB half |
+|[Blender281rgb32.exr](https://aras-p.info/files/exr_files/Blender281rgb32.exr) 	| 3840x2160 |  94.9MB | RGB float |
+|[Blender281layered16.exr](https://aras-p.info/files/exr_files/Blender281layered16.exr) 	| 3840x2160 |  332.2MB | 21 channels, half |
+|[Blender281layered32.exr](https://aras-p.info/files/exr_files/Blender281layered32.exr) 	| 3840x2160 |  664.5MB | 21 channels, float |
 |[Blender35.exr](https://aras-p.info/files/exr_files/Blender35.exr) 	| 3840x2160 | 332.2MB | 18 channels, mixed half/float |
 |[Blender40.exr](https://aras-p.info/files/exr_files/Blender40.exr) 	| 3840x2160 | 348.0MB | 15 channels, mixed half/float |
 |[Blender41.exr](https://aras-p.info/files/exr_files/Blender41.exr) 	| 3840x2160 | 743.6MB | 37 channels, mixed half/float |
@@ -72,3 +75,6 @@ Obtained through cmake `FetchContent`:
 - [libjxl](https://github.com/libjxl/libjxl) - 2025 Jun, rev a75b322e.
 - [meshoptimizer](https://github.com/zeux/meshoptimizer) - 2025 Jun, v0.24.
 
+Directly in source tree:
+
+- `src/ic_pfor.h` - parallel for utility from Ignacio Castano https://github.com/castano/icbc
