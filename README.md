@@ -27,7 +27,7 @@ Here's compression ratio (horizontal axis) vs performance (GB/s) charts; the mor
 
 | Windows (Ryzen 5950X, Visual Studio 2022 v17.14) | Mac (MacBookPro M4 Max, Xcode clang 16) |
 |-----|----|
-| ![](/img/mac-m4max-20250628.png?raw=true) | ![](/img/mac-m4max-20250628.png?raw=true) |
+| ![](/img/win-ryzen5950x-20250628.png?raw=true) | ![](/img/mac-m4max-20250628.png?raw=true) |
 
 M4 Max has *crazy high* memory bandwidth, I think that affects result difference way more than CPU & compiler differences.
 
