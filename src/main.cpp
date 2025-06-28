@@ -242,7 +242,7 @@ static void WriteReportRow(FILE* fout, uint64_t gotTypeMask, size_t cmpIndex, do
         fprintf(fout, "%s%i", cmpName, cmpLevel);
     else
         fprintf(fout, "%s", cmpName);
-    fprintf(fout, ": %.3f ratio, %.1f MB/s'", xval, yval);
+    fprintf(fout, ": %.3f ratio, %.3f GB/s'", xval, yval);
     for (size_t ii = typeIndex+1; ii < kComprTypeCount; ++ii)
     {
         if ((gotTypeMask & (1ull<<ii)) == 0)
@@ -300,7 +300,7 @@ dr.addColumn('number', '%s'); dr.addColumn({type:'string', role:'tooltip'});
         const auto& res = s_Result[cmpIndex];
         double ratio = (double)res.rawSize/(double)res.cmpSize;
         fprintf(fout, "[%.3f", ratio);
-        double perf = res.rawSize / (1024.0*1024.0) / res.tWrite;
+        double perf = res.rawSize / (1024.0*1024.0*1024.0) / res.tWrite;
         WriteReportRow(fout, gotCmpTypeMask, cmpIndex, ratio, perf);
         fprintf(fout, "]%s\n", cmpIndex == kTestComprCount-1 ? "" : ",");
     }
@@ -311,7 +311,7 @@ dr.addColumn('number', '%s'); dr.addColumn({type:'string', role:'tooltip'});
         const auto& res = s_Result[cmpIndex];
         double ratio = (double)res.rawSize/(double)res.cmpSize;
         fprintf(fout, "[%.3f", ratio);
-        double perf = res.rawSize / (1024.0*1024.0) / res.tRead;
+        double perf = res.rawSize / (1024.0*1024.0*1024.0) / res.tRead;
         WriteReportRow(fout, gotCmpTypeMask, cmpIndex, ratio, perf);
         fprintf(fout, "]%s\n", cmpIndex == kTestComprCount-1 ? "" : ",");
     }
@@ -334,7 +334,7 @@ R"(var options = {
     fprintf(fout,
 R"(        100:{}},
     hAxis: {title: 'Compression ratio', viewWindow: {min:1.0,max:3.0}},
-    vAxis: {title: 'Writing, MB/s', viewWindow: {min:0, max:6250}},
+    vAxis: {title: 'Writing, GB/s', viewWindow: {min:0, max:15.0}},
     chartArea: {left:60, right:10, top:50, bottom:50},
     legend: {position: 'top'},
     colors: [
@@ -358,8 +358,8 @@ var chw = new google.visualization.ScatterChart(document.getElementById('chart_w
 chw.draw(dw, options);
 
 options.title = 'Reading';
-options.vAxis.title = 'Reading, MB/s';
-options.vAxis.viewWindow.max = 6250;
+options.vAxis.title = 'Reading, GB/s';
+options.vAxis.viewWindow.max = 15.0;
 var chr = new google.visualization.ScatterChart(document.getElementById('chart_r'));
 chr.draw(dr, options);
 }
@@ -427,9 +427,9 @@ int main(int argc, const char** argv)
         const auto& cmp = kTestCompr[cmpIndex];
         const auto& res = s_Result[cmpIndex];
 
-        double perfWrite = res.rawSize / (1024.0*1024.0) / res.tWrite;
-        double perfRead = res.rawSize / (1024.0*1024.0) / res.tRead;
-        printf("  %6s: %7.1f MB (%5.3fx) W: %6.3f s (%5.0f MB/s) R: %6.3f s (%5.0f MB/s)\n",
+        double perfWrite = res.rawSize / (1024.0*1024.0*1024.0) / res.tWrite;
+        double perfRead = res.rawSize / (1024.0*1024.0*1024.0) / res.tRead;
+        printf("  %6s: %7.1f MB (%5.3fx) W: %6.3f s (%6.3f GB/s) R: %6.3f s (%6.3f GB/s)\n",
                kComprTypes[cmp.type].name,
                res.cmpSize/1024.0/1024.0,
                (double)res.rawSize/(double)res.cmpSize,

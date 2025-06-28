@@ -6,7 +6,7 @@
 #define IC_PFOR_IMPLEMENTATION
 #include "ic_pfor.h"
 
-constexpr size_t kChunkSize = 64 * 1024;
+constexpr size_t kChunkSize = 16 * 1024;
 
 void InitMop(int thread_count)
 {
