@@ -1,4 +1,4 @@
-# OpenEXR, HTJ2K and JPEG-XL comparison for lossless compression of half/float images
+# OpenEXR, HTJ2K, JPEG-XL et al. comparison for lossless compression of half/float images
 
 A quick test for various *lossless* compression modes of floating point images. Traditionally
 OpenEXR has been the go-to format for that; here I compare several existing lossless compression
@@ -8,6 +8,7 @@ modes in it (ZIP, PIZ, RLE), as well as others:
   format/algorithms, using open source [OpenJPH](https://github.com/aous72/OpenJPH) library.
 - [JPEG-XL](https://jpeg.org/jpegxl/index.html) file format, using open source [libjxl](https://github.com/libjxl/libjxl)
   library.
+- "MOP": not a real image format, just mis-using [meshoptimizer](https://github.com/zeux/meshoptimizer) to compress image pixels.
 
 Floating point images usually come in various forms:
 - High dynamic range "pictures", where the content is colors, just with higher dynamic range than regular images. Both increased range
@@ -22,18 +23,30 @@ Note that here I am only comparing the *lossless* compression modes. Lossy compr
 
 ### Results
 
-Here's compression ratio (horizontal axis) vs performance (MB/s) charts; the more to the upper right corner the result is, the better. A chart
+Here's compression ratio (horizontal axis) vs performance (GB/s) charts; the more to the upper right corner the result is, the better. A chart
 on Mac (M4 Max), using clang compiler from Xcode 16:
 
-![](/img/mac-m4max-20250625.png?raw=true)
+![](/img/mac-m4max-20250628.png?raw=true)
 
 Results on Windows (Ryzen 5950X, using Visual Studio 2022 v17.14) overall are similar shape, except everything is 2x-3x slower;
 partially due to compiler, partially due to CPU, partially due to M4 Max having *crazy high* memory bandwidth.
 
-### Notes
+### Code notes
 
 - I am building `Release` cmake config on both `OpenEXR` and `libjxl` libraries, as well as any dependencies they pull in.
 - I am setting up multi-threading via `Imf::setGlobalThreadCount()` for OpenEXR, and `JxlThreadParallelRunner` for libjxl.
+- For the "mesh optimizer" ("Mop") test case, I am writing an "image" by:
+  - A small header with image size and channel information,
+  - Then image is split into chunks, each being 16K pixels in size. Each chunk is compressed independently and in parallel.
+  - A small table with compressed sizes for each chunk is written after the header, followed by the compressed data itself
+    for each chunk.
+  - Mesh optimizer needs "vertex size" (pixel size in this case) to be multiple of four; if that is not the case the chunk data
+    is padded with zeroes inside the compression/decompression code.
+
+### My conclusions
+
+- Funnily enough, at least on *this* data set, all the "actual" image formats are handily beaten by mesh-optimizer.
+
 - At least on *this* data set, OpenEXR with regular ZIP compression seems best.
 - Upcoming HT256 compression in OpenEXR on this data is both *worse compression* than ZIP, and *worse performance* :(
 	- Note that I am testing OpenEXR with [PR#2061](https://github.com/AcademySoftwareFoundation/openexr/pull/2061) applied;
@@ -51,7 +64,7 @@ partially due to compiler, partially due to CPU, partially due to M4 Max having 
 
 ### Files I am testing on
 
-Uploaded separately, in order to not blow up Git repo size and/or my Github LFS billing.
+Total uncompressed size: 3122MB. Uploaded separately, in order to not blow up Git repo size and/or my Github LFS billing.
 
 | File | Resolution | Raw size | Notes |
 |------|-----------:|---------:|-------|

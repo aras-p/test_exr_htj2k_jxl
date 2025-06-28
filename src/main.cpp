@@ -78,7 +78,6 @@ static const CompressorDesc kTestCompr[] =
     // JXL
 #if 1
     { 6, 1 },
-    { 6, 2 },
     { 6, 3 },
     { 6, 4 },
     { 6, 7 }, // default level 7
@@ -319,7 +318,7 @@ dr.addColumn('number', '%s'); dr.addColumn({type:'string', role:'tooltip'});
 
     fprintf(fout,
 R"(var options = {
-    title: 'Writing',
+    title: 'Compression',
     pointSize: 18,
     series: {
 )");
@@ -334,7 +333,7 @@ R"(var options = {
     fprintf(fout,
 R"(        100:{}},
     hAxis: {title: 'Compression ratio', viewWindow: {min:1.0,max:3.0}},
-    vAxis: {title: 'Writing, GB/s', viewWindow: {min:0, max:15.0}},
+    vAxis: {title: 'Compression, GB/s', viewWindow: {min:0, max:15.0}},
     chartArea: {left:60, right:10, top:50, bottom:50},
     legend: {position: 'top'},
     colors: [
@@ -357,8 +356,8 @@ R"(]
 var chw = new google.visualization.ScatterChart(document.getElementById('chart_w'));
 chw.draw(dw, options);
 
-options.title = 'Reading';
-options.vAxis.title = 'Reading, GB/s';
+options.title = 'Decompression';
+options.vAxis.title = 'Decompression, GB/s';
 options.vAxis.viewWindow.max = 15.0;
 var chr = new google.visualization.ScatterChart(document.getElementById('chart_r'));
 chr.draw(dr, options);
