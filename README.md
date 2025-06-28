@@ -4,7 +4,7 @@ A quick test for various *lossless* compression modes of floating point images. 
 OpenEXR has been the go-to format for that; here I compare several existing lossless compression
 modes in it (ZIP, PIZ, RLE), as well as others:
 
-- OpenEXR, with upcoming `HT256` compression mode. This is based on "[High-Throughput JPEG 2000](https://jpeg.org/jpeg2000/htj2k.html)"
+- OpenEXR, with upcoming `HTJ2K` compression mode. This is based on "[High-Throughput JPEG 2000](https://jpeg.org/jpeg2000/htj2k.html)"
   format/algorithms, using open source [OpenJPH](https://github.com/aous72/OpenJPH) library.
 - [JPEG-XL](https://jpeg.org/jpegxl/index.html) file format, using open source [libjxl](https://github.com/libjxl/libjxl)
   library.
@@ -52,13 +52,11 @@ M4 Max has *crazy high* memory bandwidth, I think that affects result difference
   - [Arseny](https://zeux.io/about/) is a witch.
 - Out of actual image formats, **just use OpenEXR** would be my go today.
   - Use the usual ZIP compression, at the default (4) level, and move on with your life.
-  - Upcoming OpenEXR "HT256" compression produces slightly better compression ratio, however at a bit slower compression,
+  - Upcoming OpenEXR "HTJ2K" compression produces slightly better compression ratio, however at a bit slower compression,
     and 2x slower decompression speeds. Not sure if good tradeoff.
-    - Note that I am testing OpenEXR with [PR#2061](https://github.com/AcademySoftwareFoundation/openexr/pull/2061) applied;
-      without it the performance on Windows is *way* worse.
 - **JPEG-XL is not great for lossless floating point compression right now**.
   - Compression levels 1/2 are _barely_ better ratio than EXR ZIP, but are 3-5x slower to compress/decompress.
-  - Compression level 4 is indeed better ratio (2.09x, compared to EXR ZIP 1.87x, EXR HT256 1.95x), but are 5-10x slower to compress.
+  - Compression level 4 is indeed better ratio (2.09x, compared to EXR ZIP 1.87x, EXR HTJ2K 1.95x), but are 5-10x slower to compress.
   - The default compression level (7) is even slower, at 2.18x ratio. Feels like overkill though.
   - My impression is that floating point paths within `libjxl` did not (yet?) get the same attention as "regular images" did; it is very
     possible that they will improve the performance and/or ratio in the future (I was testing end-of-June 2025 code).
@@ -72,7 +70,7 @@ M4 Max has *crazy high* memory bandwidth, I think that affects result difference
 
 Code size impact, i.e. executable size increase of Win x64 statically linked executable:
 
-- EXR HT256: +308 KB
+- EXR HTJ2K: +308 KB
 - JPEG-XL: +6017 KB
 - mesh optimizer: +26 KB
 

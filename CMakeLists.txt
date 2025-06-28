@@ -15,11 +15,7 @@ option(BUILD_SHARED_LIBS "" OFF)
 if (INCLUDE_FORMAT_EXR)
     FetchContent_Declare(
 	    openexr
-	    #URL https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/v3.3.4.zip # latest (2025 Jun) at time of writing
-        #URL https://github.com/AcademySoftwareFoundation/openexr/archive/ac31208e9433611003032c0a9f4ebcf050574f41.zip # 2025 May, beta with HTJ2K compression
-
-        # 2025 June, beta with HTJ2K compression, and a patch that fixes Windows perf issue (https://github.com/AcademySoftwareFoundation/openexr/pull/2061)
-        URL https://github.com/sandflow/openexr-ht/archive/1103c6d112a5a5beed8e8ac06156bbde2170e58d.zip
+        URL https://github.com/AcademySoftwareFoundation/openexr/archive/45ee12752f9c26f601e21a5e7b782f6dbf857271.zip # 2025 Jun, post-3.3.4 with HTJ2K compression
     )
     option(BUILD_TESTING "" OFF)
     option(OPENEXR_BUILD_TOOLS "" OFF)

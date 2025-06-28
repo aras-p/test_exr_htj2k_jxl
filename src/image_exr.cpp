@@ -55,7 +55,7 @@ bool SaveExrFile(MyOStream &mem, const Image& image, CompressorType cmp_type, in
         case CompressorType::ExrRLE: compression = Imf::RLE_COMPRESSION; break;
         case CompressorType::ExrPIZ: compression = Imf::PIZ_COMPRESSION; break;
         case CompressorType::ExrZIP: compression = Imf::ZIP_COMPRESSION; break;
-        case CompressorType::ExrHT256: compression = Imf::HTJ2K_COMPRESSION; break;
+        case CompressorType::ExrHTJ2K: compression = Imf::HTJ2K_COMPRESSION; break;
         default: return false;
     }
     

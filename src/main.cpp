@@ -45,7 +45,7 @@ static const CompressorTypeDesc kComprTypes[] =
     {"RLE",     CompressorType::ExrRLE,     "6080a0", 0}, // 2, gray-ish
     {"PIZ",     CompressorType::ExrPIZ,     "ff9a44", 0}, // 3, orange
     {"Zip",     CompressorType::ExrZIP,     "12b520", 0}, // 4, green
-    {"HT256",   CompressorType::ExrHT256,   "0094ef", 0}, // 5, blue
+    {"HTJ2K",   CompressorType::ExrHTJ2K,   "0094ef", 0}, // 5, blue
 	{"JXL",     CompressorType::Jxl,        "e01010", 0}, // 6, red
     {"Mop",     CompressorType::Mop,        "ac74d0", 0}, // 7, magenta-ish
 };
@@ -72,7 +72,7 @@ static const CompressorDesc kTestCompr[] =
     //{ 4, 6 },
     //{ 4, 9 },
 
-    { 5, 0 }, // HT256
+    { 5, 0 }, // HTJ2K
 #endif 
     
     // JXL
