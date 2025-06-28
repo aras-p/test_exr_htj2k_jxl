@@ -23,13 +23,13 @@ Note that here I am only comparing the *lossless* compression modes. Lossy compr
 
 ### Results
 
-Here's compression ratio (horizontal axis) vs performance (GB/s) charts; the more to the upper right corner the result is, the better. A chart
-on Mac (M4 Max), using clang compiler from Xcode 16:
+Here's compression ratio (horizontal axis) vs performance (GB/s) charts; the more to the upper right corner the result is, the better.
 
-![](/img/mac-m4max-20250628.png?raw=true)
+| Windows (Ryzen 5950X, Visual Studio 2022 v17.14) | Mac (MacBookPro M4 Max, Xcode clang 16) |
+|-----|----|
+| ![](/img/mac-m4max-20250628.png?raw=true) | ![](/img/mac-m4max-20250628.png?raw=true) |
 
-Results on Windows (Ryzen 5950X, using Visual Studio 2022 v17.14) overall are similar shape, except everything is 2x-3x slower;
-partially due to compiler, partially due to CPU, partially due to M4 Max having *crazy high* memory bandwidth.
+M4 Max has *crazy high* memory bandwidth, I think that affects result difference way more than CPU & compiler differences.
 
 ### Code notes
 
@@ -45,20 +45,29 @@ partially due to compiler, partially due to CPU, partially due to M4 Max having 
 
 ### My conclusions
 
-- Funnily enough, at least on *this* data set, all the "actual" image formats are handily beaten by mesh-optimizer.
-
-- At least on *this* data set, OpenEXR with regular ZIP compression seems best.
-- Upcoming HT256 compression in OpenEXR on this data is both *worse compression* than ZIP, and *worse performance* :(
-	- Note that I am testing OpenEXR with [PR#2061](https://github.com/AcademySoftwareFoundation/openexr/pull/2061) applied;
+- **mesh optimizer is very impressive!**
+  - Yes that is not an actual image format, but it is funny that it *very* far ahead of others towards top right of the chart.
+  - If you have some floating point pixel data to compress for internal usage, and don't care about interop with other applications,
+    then trying out mesh optimizer sounds like a good idea.
+  - [Arseny](https://zeux.io/about/) is a witch.
+- Out of actual image formats, **just use OpenEXR** would be my go today.
+  - Use the usual ZIP compression, at the default (4) level, and move on with your life.
+  - Upcoming OpenEXR "HT256" compression produces slightly better compression ratio, however at a bit slower compression,
+    and 2x slower decompression speeds. Not sure if good tradeoff.
+    - Note that I am testing OpenEXR with [PR#2061](https://github.com/AcademySoftwareFoundation/openexr/pull/2061) applied;
       without it the performance on Windows is *way* worse.
-- JPEG-XL at default compression effort level (7) does produce smaller files (EXR ZIP: 2.19x ratio, JXL 7: 2.42x ratio), but
-  compression is *20x slower*, and decompression is *9x slower*.
-  Which to me does not feel like a cost worth paying for a fairly small increase in compression ratio.
-  - At lowest compression effort level (1) JXL produces compression ratio 2.04x (so worse than EXR ZIP), while still being
-    3x slower at compression, and 4x slower at decompression.
-  - However, a cumbersome part of JXL is that color channels need to be interleaved, and all the "other channels" need
+- **JPEG-XL is not great for lossless floating point compression right now**.
+  - Compression levels 1/2 are _barely_ better ratio than EXR ZIP, but are 3-5x slower to compress/decompress.
+  - Compression level 4 is indeed better ratio (2.09x, compared to EXR ZIP 1.87x, EXR HT256 1.95x), but are 5-10x slower to compress.
+  - The default compression level (7) is even slower, at 2.18x ratio. Feels like overkill though.
+  - My impression is that floating point paths within `libjxl` did not (yet?) get the same attention as "regular images" did; it is very
+    possible that they will improve the performance and/or ratio in the future (I was testing end-of-June 2025 code).
+  - A cumbersome part of `libjxl` is that color channels need to be interleaved, and all the "other channels" need
     to be separate (planar). All my data is fully interleaved, so it costs some performance to arrange it as libjxl wants,
-    both for compression and after decompression.
+    both for compression and after decompression. As a user, it would be much more convenient to use if their API
+    was similar to OpenEXR `Slice` that takes a pointer and two strides (stride between pixels, and stride between rows). Then
+    any combination of interleaved/planar or mixed formats for different channels could be passed with the same API.
+    In this very repository, `image_exr.cpp` is 80 lines of code, while `image_jxl.cpp` is 550 lines of code :scream:
   - `libjxl` currently is not fully lossless on half-precision subnormal values ([#3881](https://github.com/libjxl/libjxl/issues/3881)).
 
 
