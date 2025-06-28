@@ -70,4 +70,5 @@ Obtained through cmake `FetchContent`:
 - [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) - 2025 Jun, beta branch with HTJ2K support and with a PR that fixes Windows
   performance issue related to `realloc`.
 - [libjxl](https://github.com/libjxl/libjxl) - 2025 Jun, rev a75b322e.
+- [meshoptimizer](https://github.com/zeux/meshoptimizer) - 2025 Jun, v0.24.
 

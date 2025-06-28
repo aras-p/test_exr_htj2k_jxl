@@ -13,6 +13,7 @@ enum class CompressorType
     ExrZIP,
     ExrHT256,
     Jxl,
+    Mop,
 };
 
 struct Image

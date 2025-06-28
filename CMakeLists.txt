@@ -51,6 +51,14 @@ option(JPEGXL_ENABLE_OPENEXR "" OFF)
 option(JPEGXL_ENABLE_TRANSCODE_JPEG "" OFF)
 FetchContent_MakeAvailable(libjxl)
 
+# meshoptimizer
+FetchContent_Declare(
+	meshoptimizer
+	URL https://github.com/zeux/meshoptimizer/archive/refs/tags/v0.24.zip # latest (2025 Jun) at time of writing
+)
+option(MESHOPT_INSTALL "" OFF)
+FetchContent_MakeAvailable(meshoptimizer)
+
 project ("test_exr_htj2k_jxl")
 add_executable (test_exr_htj2k_jxl
     src/image.cpp
@@ -59,6 +67,8 @@ add_executable (test_exr_htj2k_jxl
     src/image_exr.h
     src/image_jxl.cpp
     src/image_jxl.h
+    src/image_mop.cpp
+    src/image_mop.h
     src/main.cpp
     src/fileio.cpp
     src/fileio.h
@@ -69,6 +79,7 @@ add_executable (test_exr_htj2k_jxl
 target_link_libraries(test_exr_htj2k_jxl PRIVATE
     OpenEXR::OpenEXR
     jxl_dec-obj jxl_enc-obj jxl_cms jxl_threads brotlidec brotlienc hwy
+    meshoptimizer
 )
 set_property(TARGET test_exr_htj2k_jxl PROPERTY CXX_STANDARD 17)
 target_compile_definitions(test_exr_htj2k_jxl PRIVATE CRT_SECURE_NO_DEPRECATE _CRT_NONSTDC_NO_WARNINGS NOMINMAX $<$<CONFIG:Debug>:_DEBUG>)

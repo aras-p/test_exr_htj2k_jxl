@@ -18,6 +18,10 @@ public:
 
     const char* data() const { return _buffer; }
     size_t size() const { return _size; }
+
+    template<typename T>
+    void read(T& v) { read((char*)&v, sizeof(v)); }
+
 private:
     const char* _buffer;
 	size_t _pos;
@@ -34,6 +38,9 @@ public:
     virtual void write(const char c[/*n*/], int n);
     virtual uint64_t tellp();
     virtual void seekp(uint64_t pos);
+
+    template<typename T>
+    void write(const T& v) { write((const char*)&v, sizeof(v)); }
 
     const char* data() const { return _buffer.data(); }
     size_t size() const { return _buffer.size(); }

@@ -47,7 +47,7 @@ bool LoadExrFile(MyIStream &mem, Image& r_image)
     return true;
 }
 
-void SaveExrFile(MyOStream &mem, const Image& image, CompressorType cmp_type, int cmp_level)
+bool SaveExrFile(MyOStream &mem, const Image& image, CompressorType cmp_type, int cmp_level)
 {
     Imf::Compression compression = Imf::NUM_COMPRESSION_METHODS;
     switch (cmp_type) {
@@ -56,7 +56,7 @@ void SaveExrFile(MyOStream &mem, const Image& image, CompressorType cmp_type, in
         case CompressorType::ExrPIZ: compression = Imf::PIZ_COMPRESSION; break;
         case CompressorType::ExrZIP: compression = Imf::ZIP_COMPRESSION; break;
         case CompressorType::ExrHT256: compression = Imf::HTJ2K_COMPRESSION; break;
-        default: break;
+        default: return false;
     }
     
     Imf::Header header(int(image.width), int(image.height));
@@ -79,4 +79,5 @@ void SaveExrFile(MyOStream &mem, const Image& image, CompressorType cmp_type, in
     Imf::OutputFile file(mem, header);
     file.setFrameBuffer(fb);
     file.writePixels(int(image.height));
+    return true;
 }

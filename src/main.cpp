@@ -11,6 +11,7 @@
 #include "image.h"
 #include "image_exr.h"
 #include "image_jxl.h"
+#include "image_mop.h"
 
 #ifdef _DEBUG
 const int kRunCount = 1;
@@ -46,6 +47,7 @@ static const CompressorTypeDesc kComprTypes[] =
     {"Zip",     CompressorType::ExrZIP,     "12b520", 0}, // 4, green
     {"HT256",   CompressorType::ExrHT256,   "0094ef", 0}, // 5, blue
 	{"JXL",     CompressorType::Jxl,        "e01010", 0}, // 6, red
+    {"Mop",     CompressorType::Mop,        "808080", 0}, // 7, gray
 };
 constexpr size_t kComprTypeCount = sizeof(kComprTypes) / sizeof(kComprTypes[0]);
 
@@ -79,6 +81,11 @@ static const CompressorDesc kTestCompr[] =
     { 6, 4 },
     { 6, 7 }, // default level 7
     //{ 6, 9 },
+#endif
+
+    // Mop
+#if 1
+    { 7, 2 }, // default level 2
 #endif
 };
 constexpr size_t kTestComprCount = sizeof(kTestCompr) / sizeof(kTestCompr[0]);
@@ -141,9 +148,21 @@ static bool TestFile(const char* file_path, int run_index)
                 return false;
             }
         }
+        else if (cmp_type == CompressorType::Mop)
+        {
+            if (!SaveMopFile(mem_out, img_in, cmp.level))
+            {
+                printf("ERROR: file could not be saved to MOP %s\n", fname_part);
+                return false;
+            }
+        }
         else
         {
-            SaveExrFile(mem_out, img_in, cmp_type, cmp.level);
+            if (!SaveExrFile(mem_out, img_in, cmp_type, cmp.level))
+            {
+                printf("ERROR: file could not be saved to EXR %s\n", fname_part);
+                return false;
+            }
         }
         t_write = time_duration_ms(t_write_0) / 1000.0f;
         size_t out_size = mem_out.size();
@@ -164,6 +183,14 @@ static bool TestFile(const char* file_path, int run_index)
             if (!LoadJxlFile(mem_got_in, img_got))
             {
                 printf("ERROR: file could not be loaded from JXL %s\n", fname_part);
+                return false;
+            }
+        }
+        else if (cmp_type == CompressorType::Mop)
+        {
+            if (!LoadMopFile(mem_got_in, img_got))
+            {
+                printf("ERROR: file could not be loaded from MOP %s\n", fname_part);
                 return false;
             }
         }
@@ -350,6 +377,7 @@ int main(int argc, const char** argv)
     printf("Setting EXR/JXL to %i threads\n", nThreads);
     InitExr(nThreads);
     InitJxl(nThreads);
+    InitMop(nThreads);
 
     for (int ri = 0; ri < kRunCount; ++ri)
     {
