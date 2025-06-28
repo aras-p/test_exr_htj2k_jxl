@@ -68,11 +68,18 @@ M4 Max has *crazy high* memory bandwidth, I think that affects result difference
     In this very repository, `image_exr.cpp` is 80 lines of code, while `image_jxl.cpp` is 550 lines of code :scream:
   - `libjxl` currently is not fully lossless on half-precision subnormal values ([#3881](https://github.com/libjxl/libjxl/issues/3881)).
 
-Code size impact, i.e. executable size increase of Win x64 statically linked executable:
+Most of the images I am testing with are "rendered result", with a bunch of path-tracing noise (in multi-layered images the main result
+might be denoised, but some other channels would not be). It could very well be that the "big serious" codecs (HTJ2K, JPEG-XL) are way
+better at compressing "natural" images or ones with camera-style noise. To be investigated by future research!
 
-- EXR HTJ2K: +308 KB
-- JPEG-XL: +6017 KB
-- mesh optimizer: +26 KB
+
+### Code size impact
+
+Size increase of Win x64 statically linked executable, for each of the compression codecs:
+
+- EXR HTJ2K: +308 KB. _Okay._
+- JPEG-XL: +6017 KB. _Big!_
+- mesh optimizer: +26 KB. _Tiny!_
 
 ### Files I am testing on
 
@@ -95,8 +102,7 @@ Total uncompressed size: 3122MB. Uploaded separately, in order to not blow up Gi
 
 Obtained through cmake `FetchContent`:
 
-- [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) - 2025 Jun, beta branch with HTJ2K support and with a PR that fixes Windows
-  performance issue related to `realloc`.
+- [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) - 2025 Jun, 3.4.0-dev with HTJ2K support (rev 45ee12752).
 - [libjxl](https://github.com/libjxl/libjxl) - 2025 Jun, rev a75b322e.
 - [meshoptimizer](https://github.com/zeux/meshoptimizer) - 2025 Jun, v0.24.
 
