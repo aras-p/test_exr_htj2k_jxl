@@ -2,14 +2,23 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <vector>
+#ifdef INCLUDE_FORMAT_EXR
 #include "ImfIO.h"
+#endif
 
-class MyIStream : public Imf::IStream
+class MyIStream
+#ifdef INCLUDE_FORMAT_EXR
+    : public Imf::IStream
+#endif
 {
 public:
     MyIStream(const char* fileName);
     MyIStream(const char* buffer, size_t size)
-        : IStream("<mem>"), _buffer(buffer), _pos(0), _size(size), _owns_buffer(false) {}
+        :
+#ifdef INCLUDE_FORMAT_EXR
+        IStream("<mem>"),
+#endif
+        _buffer(buffer), _pos(0), _size(size), _owns_buffer(false) {}
     ~MyIStream();
     virtual bool read(char c[], int n);
     virtual uint64_t tellg();
@@ -29,7 +38,10 @@ private:
     bool _owns_buffer = false;
 };
 
-class MyOStream : public Imf::OStream
+class MyOStream
+#ifdef INCLUDE_FORMAT_EXR
+    : public Imf::OStream
+#endif
 {
 public:
     MyOStream();

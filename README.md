@@ -70,6 +70,11 @@ M4 Max has *crazy high* memory bandwidth, I think that affects result difference
     In this very repository, `image_exr.cpp` is 80 lines of code, while `image_jxl.cpp` is 550 lines of code :scream:
   - `libjxl` currently is not fully lossless on half-precision subnormal values ([#3881](https://github.com/libjxl/libjxl/issues/3881)).
 
+Code size impact, i.e. executable size increase of Win x64 statically linked executable:
+
+- EXR HT256: +308 KB
+- JPEG-XL: +6017 KB
+- mesh optimizer: +26 KB
 
 ### Files I am testing on
 

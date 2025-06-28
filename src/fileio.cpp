@@ -1,14 +1,22 @@
 #include "fileio.h"
+#ifdef INCLUDE_FORMAT_EXR
 #include "Iex.h"
+#endif
 #include <stdio.h>
 
 MyIStream::MyIStream(const char* fileName)
-	: IStream("<memory>"), _buffer(nullptr), _pos(0), _size(0), _owns_buffer(true)
+	:
+#ifdef INCLUDE_FORMAT_EXR
+    IStream("<memory>"),
+#endif
+    _buffer(nullptr), _pos(0), _size(0), _owns_buffer(true)
 {
     FILE* f = fopen(fileName, "rb");
     if (f == nullptr)
     {
+#ifdef INCLUDE_FORMAT_EXR
         throw IEX_NAMESPACE::InputExc("Could not read file");
+#endif
         return;
     }
 
@@ -31,7 +39,10 @@ bool MyIStream::read (char c[/*n*/], int n)
 {
     if (_pos + n > _size)
     {
-		throw IEX_NAMESPACE::InputExc("Unexpected end of file.");
+#ifdef INCLUDE_FORMAT_EXR
+        throw IEX_NAMESPACE::InputExc("Unexpected end of file.");
+#endif
+        return false;
     }
     memcpy(c, _buffer + _pos, n);
     _pos += n;
@@ -47,7 +58,10 @@ void MyIStream::seekg (uint64_t pos)
 {
 	if (_pos > _size)
 	{
-		throw IEX_NAMESPACE::InputExc("Invalid seek offset");
+#ifdef INCLUDE_FORMAT_EXR
+        throw IEX_NAMESPACE::InputExc("Invalid seek offset");
+#endif
+        return;
     }
     _pos = pos;
 }
@@ -57,7 +71,11 @@ void MyIStream::clear ()
 }
 
 MyOStream::MyOStream()
-    : OStream("<mem>"), _pos(0)
+    :
+#ifdef INCLUDE_FORMAT_EXR
+    OStream("<mem>"),
+#endif
+    _pos(0)
 {
     _buffer.reserve(16 * 1024 * 1024);
 }

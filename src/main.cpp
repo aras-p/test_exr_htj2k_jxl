@@ -62,7 +62,7 @@ static const CompressorDesc kTestCompr[] =
     //{ 0, 0 }, // just raw bits read/write
     
     // EXR
-#if 1
+#ifdef INCLUDE_FORMAT_EXR
     //{ 1, 0 }, // None
     { 2, 0 }, // RLE
     { 3, 0 }, // PIZ
@@ -76,7 +76,7 @@ static const CompressorDesc kTestCompr[] =
 #endif 
     
     // JXL
-#if 1
+#ifdef INCLUDE_FORMAT_JXL
     { 6, 1 },
     { 6, 3 },
     { 6, 4 },
@@ -85,7 +85,7 @@ static const CompressorDesc kTestCompr[] =
 #endif
 
     // Mop
-#if 1
+#ifdef INCLUDE_FORMAT_MOP
     { 7, 0 },
     { 7, 1 },
     { 7, 2 }, // default level 2
@@ -146,19 +146,23 @@ static bool TestFile(const char* file_path, int run_index)
         }
         else if (cmp_type == CompressorType::Jxl)
         {
+#ifdef INCLUDE_FORMAT_JXL
             if (!SaveJxlFile(mem_out, img_in, cmp.level))
             {
                 printf("ERROR: file could not be saved to JXL %s\n", fname_part);
                 return false;
             }
+#endif
         }
         else if (cmp_type == CompressorType::Mop)
         {
+#ifdef INCLUDE_FORMAT_MOP
             if (!SaveMopFile(mem_out, img_in, cmp.level))
             {
                 printf("ERROR: file could not be saved to MOP %s\n", fname_part);
                 return false;
             }
+#endif
         }
         else
         {
@@ -184,19 +188,23 @@ static bool TestFile(const char* file_path, int run_index)
         }
         else if (cmp_type == CompressorType::Jxl)
         {
+#ifdef INCLUDE_FORMAT_JXL
             if (!LoadJxlFile(mem_got_in, img_got))
             {
                 printf("ERROR: file could not be loaded from JXL %s\n", fname_part);
                 return false;
             }
+#endif
         }
         else if (cmp_type == CompressorType::Mop)
         {
+#ifdef INCLUDE_FORMAT_MOP
             if (!LoadMopFile(mem_got_in, img_got))
             {
                 printf("ERROR: file could not be loaded from MOP %s\n", fname_part);
                 return false;
             }
+#endif
         }
         else
         {
@@ -380,8 +388,12 @@ int main(int argc, const char** argv)
 //#endif
     printf("Setting EXR/JXL to %i threads\n", nThreads);
     InitExr(nThreads);
+#ifdef INCLUDE_FORMAT_JXL
     InitJxl(nThreads);
+#endif
+#ifdef INCLUDE_FORMAT_MOP
     InitMop(nThreads);
+#endif
 
     for (int ri = 0; ri < kRunCount; ++ri)
     {
