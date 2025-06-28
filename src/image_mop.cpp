@@ -3,12 +3,14 @@
 
 #include "image_mop.h"
 #include "fileio.h"
+#define IC_PFOR_IMPLEMENTATION
+#include "ic_pfor.h"
 
 constexpr size_t kChunkSize = 64 * 1024;
 
 void InitMop(int thread_count)
 {
-    //@TODO
+    ic::init_pfor(thread_count);
 }
 
 bool LoadMopFile(MyIStream &mem, Image& r_image)
@@ -56,27 +58,41 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
     size_t chunk_count = (pixel_count + kChunkSize - 1) / kChunkSize;
     const size_t coded_stride = (pixel_stride + 3) / 4 * 4; // mesh optimizer requires stride to be multiple of 4
 
-    uint64_t pos = mem.tellg();
-    for (size_t ick = 0; ick < chunk_count; ++ick)
+    std::vector<std::pair<size_t, size_t>> chunk_start_size(chunk_count);
+    for (auto& chunk : chunk_start_size)
     {
-        size_t encSize = 0;
-        memcpy(&encSize, mem.data() + pos, sizeof(encSize));
-        pos += sizeof(encSize);
+        mem.read(chunk.second);
+    }
+    uint64_t pos = mem.tellg();
+    for (auto& chunk : chunk_start_size)
+    {
+        chunk.first = pos;
+        pos += chunk.second;
+    }
 
-        const size_t chunk_pixel_count = ick == chunk_count - 1 ? pixel_count - ick * kChunkSize : kChunkSize;
-        char* dst_data = r_image.pixels.data() + ick * kChunkSize * pixel_stride;
+    bool ok = true;
+    ic::pfor(chunk_count, 1, [&](int index) {
+        const size_t encStart = chunk_start_size[index].first;
+        const size_t encSize = chunk_start_size[index].second;
+
+        const size_t chunk_pixel_count = index == chunk_count - 1 ? pixel_count - index * kChunkSize : kChunkSize;
+        char* dst_data = r_image.pixels.data() + index * kChunkSize * pixel_stride;
         if (coded_stride == pixel_stride)
         {
-            if (meshopt_decodeVertexBuffer(dst_data, chunk_pixel_count, coded_stride, (const uint8_t*)mem.data() + pos, encSize) != 0)
-                return false;
+            if (meshopt_decodeVertexBuffer(dst_data, chunk_pixel_count, coded_stride, (const uint8_t*)mem.data() + encStart, encSize) != 0)
+            {
+                ok = false;
+                return;
+            }
         }
         else
         {
             char* padded_data = new char[chunk_pixel_count * coded_stride];
-            if (meshopt_decodeVertexBuffer(padded_data, chunk_pixel_count, coded_stride, (const uint8_t*)mem.data() + pos, encSize) != 0)
+            if (meshopt_decodeVertexBuffer(padded_data, chunk_pixel_count, coded_stride, (const uint8_t*)mem.data() + encStart, encSize) != 0)
             {
                 delete[] padded_data;
-                return false;
+                ok = false;
+                return;
             }
             const char* src = padded_data;
             char* dst = dst_data;
@@ -88,10 +104,9 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
             }
             delete[] padded_data;
         }
-        pos += encSize;
-    }
+        });
 
-    return true;
+    return ok;
 }
 
 bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
@@ -120,12 +135,14 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
     const size_t pixel_stride = image.pixels.size() / pixel_count;
     const size_t coded_stride = (pixel_stride + 3) / 4 * 4; // mesh optimizer requires stride to be multiple of 4
     size_t chunk_count = (pixel_count + kChunkSize - 1) / kChunkSize;
-    for (size_t ick = 0; ick < chunk_count; ++ick)
-    {
-        const size_t chunk_pixel_count = ick == chunk_count - 1 ? pixel_count - ick * kChunkSize : kChunkSize;
+
+    std::vector<std::pair<uint8_t*, size_t>> encoded_chunks(chunk_count);
+
+    ic::pfor(chunk_count, 1, [&](int index) {
+        const size_t chunk_pixel_count = index == chunk_count - 1 ? pixel_count - index * kChunkSize : kChunkSize;
         size_t bufSize = meshopt_encodeVertexBufferBound(chunk_pixel_count, coded_stride);
         uint8_t* buf = new uint8_t[bufSize];
-        const char* src_data = image.pixels.data() + ick * kChunkSize * pixel_stride;
+        const char* src_data = image.pixels.data() + index * kChunkSize * pixel_stride;
         size_t encSize = 0;
         if (pixel_stride == coded_stride)
         {
@@ -152,9 +169,17 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
                 cmp_level, 1);
             delete[] padded_data;
         }
-        mem.write(encSize);
-        mem.write((const char*)buf, encSize);
-        delete[] buf;
+        encoded_chunks[index] = { buf, encSize };
+        });
+
+    for (std::pair<uint8_t*, size_t>& chunk : encoded_chunks)
+    {
+        mem.write(chunk.second);
+    }
+    for (std::pair<uint8_t*, size_t>& chunk : encoded_chunks)
+    {
+        mem.write((const char*)chunk.first, chunk.second);
+        delete[] chunk.first;
     }
     return true;
 }
