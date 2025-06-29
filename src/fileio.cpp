@@ -3,6 +3,7 @@
 #include "Iex.h"
 #endif
 #include <stdio.h>
+#include <string.h>
 
 MyIStream::MyIStream(const char* fileName)
 	:
