@@ -35,7 +35,7 @@ bool LoadExrFile(MyIStream &mem, Image& r_image)
     }
     
     r_image.pixels_size = r_image.width * r_image.height * offset;
-    r_image.pixels = std::make_unique<char[]>(r_image.pixels_size);
+    r_image.pixels.reset(new char[r_image.pixels_size]);
     
     Imf::FrameBuffer fb;
     for (const auto& ch : r_image.channels) {

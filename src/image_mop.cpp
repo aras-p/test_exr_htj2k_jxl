@@ -56,7 +56,7 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
 
     const size_t pixel_count = r_image.width * r_image.height;
     r_image.pixels_size = pixel_count * pixel_stride;
-    r_image.pixels = std::make_unique<char[]>(r_image.pixels_size);
+    r_image.pixels.reset(new char[r_image.pixels_size]);
 
     size_t chunk_count = (pixel_count + kChunkSize - 1) / kChunkSize;
     const size_t coded_stride = (pixel_stride + 3) / 4 * 4; // mesh optimizer requires stride to be multiple of 4

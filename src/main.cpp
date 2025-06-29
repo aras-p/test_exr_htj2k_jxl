@@ -183,7 +183,7 @@ static bool TestFile(const char* file_path, int run_index)
         {
             img_got.width = img_in.width;
             img_got.height = img_in.height;
-            img_got.pixels = std::make_unique<char[]>(img_in.pixels_size);
+            img_got.pixels.reset(new char[img_in.pixels_size]);
             img_got.pixels_size = img_in.pixels_size;
             memcpy(img_got.pixels.get(), mem_got_in.data(), img_got.pixels_size);
         }
