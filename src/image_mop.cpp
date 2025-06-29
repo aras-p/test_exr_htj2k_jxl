@@ -73,8 +73,13 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
         pos += chunk.second;
     }
 
+    std::unique_ptr<char[]> padded_buffer;
+    if (coded_stride != pixel_stride) {
+        padded_buffer.reset(new char[ic::pfor_workers() * kChunkSize * coded_stride]);
+    }
+
     bool ok = true;
-    ic::pfor(unsigned(chunk_count), 1, [&](int index) {
+    ic::pfor(unsigned(chunk_count), 1, [&](int index, int tid) {
         const size_t encStart = chunk_start_size[index].first;
         const size_t encSize = chunk_start_size[index].second;
 
@@ -90,7 +95,7 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
         }
         else
         {
-            char* padded_data = new char[chunk_pixel_count * coded_stride];
+            char* padded_data = padded_buffer.get() + kChunkSize * coded_stride * tid;
             if (meshopt_decodeVertexBuffer(padded_data, chunk_pixel_count, coded_stride, (const uint8_t*)mem.data() + encStart, encSize) != 0)
             {
                 delete[] padded_data;
@@ -105,7 +110,6 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
                 src += coded_stride;
                 dst += pixel_stride;
             }
-            delete[] padded_data;
         }
         });
 
@@ -141,7 +145,7 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
 
     std::vector<std::pair<uint8_t*, size_t>> encoded_chunks(chunk_count);
 
-    ic::pfor(unsigned(chunk_count), 1, [&](int index) {
+    ic::pfor(unsigned(chunk_count), 1, [&](int index, int tid) {
         const size_t chunk_pixel_count = index == chunk_count - 1 ? pixel_count - index * kChunkSize : kChunkSize;
         size_t bufSize = meshopt_encodeVertexBufferBound(chunk_pixel_count, coded_stride);
         uint8_t* buf = new uint8_t[bufSize];
