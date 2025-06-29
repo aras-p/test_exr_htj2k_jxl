@@ -115,7 +115,8 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
             total_buffer_size = r_image.width * r_image.height * offset;
             if (extra_non_alpha_channels == 0)
             {
-                r_image.pixels.resize(total_buffer_size);
+                r_image.pixels = std::make_unique<char[]>(total_buffer_size);
+                r_image.pixels_size = total_buffer_size;
             }
             else
             {
@@ -159,7 +160,7 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
         {
             JxlPixelFormat ch_fmt = { uint32_t(rgba_channels), r_image.channels.front().fp16 ? JXL_TYPE_FLOAT16 : JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0};
             size_t ch_total_size = r_image.width * r_image.height * (ch_fmt.data_type == JXL_TYPE_FLOAT16 ? 2 : 4) * ch_fmt.num_channels;
-            if (JxlDecoderSetImageOutBuffer(dec.get(), &ch_fmt, extra_non_alpha_channels == 0 ? (uint8_t*)r_image.pixels.data() : planar_buffer.get(), ch_total_size) != JXL_DEC_SUCCESS)
+            if (JxlDecoderSetImageOutBuffer(dec.get(), &ch_fmt, extra_non_alpha_channels == 0 ? (uint8_t*)r_image.pixels.get() : planar_buffer.get(), ch_total_size) != JXL_DEC_SUCCESS)
             {
                 printf("Failed to read JXL: JxlDecoderSetImageOutBuffer failed\n");
                 return false;
@@ -201,10 +202,11 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
         // into destination, with scattered reads (i.e. order is "for all pixels,
         // for all channels") than it is to do linear reads, scattered writes
         // ("for all channels, for all pixels").
-        r_image.pixels.resize(total_buffer_size);
+        r_image.pixels = std::make_unique<char[]>(total_buffer_size);
+        r_image.pixels_size = total_buffer_size;
         const uint8_t* src_ptr = planar_buffer.get();
-        const size_t pixel_stride = r_image.pixels.size() / r_image.width / r_image.height;
-        char* dst_ptr = r_image.pixels.data();
+        const size_t pixel_stride = total_buffer_size / r_image.width / r_image.height;
+        char* dst_ptr = r_image.pixels.get();
 
         const size_t color_ch_stride = rgba_channels * (r_image.channels[0].fp16 ? 2 : 4);
         const uint8_t* src_col_ptr = src_ptr;
@@ -366,7 +368,7 @@ bool SaveJxlFile(MyOStream& mem, const Image& image, int cmp_level)
         JxlEncoderFrameSettingsSetOption(frame, JXL_ENC_FRAME_SETTING_EFFORT, cmp_level);
 
     // If we have RGB(A), assemble that into interleaved format and pass to JXL
-    const size_t pixel_stride = image.pixels.size() / image.width / image.height;
+    const size_t pixel_stride = image.pixels_size / image.width / image.height;
     std::vector<char> ch_buffer;
     if (use_rgb && use_alpha)
     {
@@ -380,7 +382,7 @@ bool SaveJxlFile(MyOStream& mem, const Image& image, int cmp_level)
         const size_t offset_g = image.channels[rgba.g].offset;
         const size_t offset_b = image.channels[rgba.b].offset;
         const size_t offset_a = image.channels[rgba.a].offset;
-        const char* src = image.pixels.data();
+        const char* src = image.pixels.get();
         char* dst = ch_buffer.data();
         if (ch_stride == 2)
         {
@@ -424,7 +426,7 @@ bool SaveJxlFile(MyOStream& mem, const Image& image, int cmp_level)
         const size_t offset_r = image.channels[rgba.r].offset;
         const size_t offset_g = image.channels[rgba.g].offset;
         const size_t offset_b = image.channels[rgba.b].offset;
-        const char* src = image.pixels.data();
+        const char* src = image.pixels.get();
         char* dst = ch_buffer.data();
         if (ch_stride == 2)
         {
@@ -478,7 +480,7 @@ bool SaveJxlFile(MyOStream& mem, const Image& image, int cmp_level)
         }
         if (ch_stride == 2)
         {
-            const char* src = image.pixels.data() + ch.offset;
+            const char* src = image.pixels.get() + ch.offset;
             char* dst = ch_buffer.data();
             for (size_t i = 0, n = image.width * image.height; i != n; ++i)
             {
@@ -489,7 +491,7 @@ bool SaveJxlFile(MyOStream& mem, const Image& image, int cmp_level)
         }
         else if (ch_stride == 4)
         {
-            const char* src = image.pixels.data() + ch.offset;
+            const char* src = image.pixels.get() + ch.offset;
             char* dst = ch_buffer.data();
             for (size_t i = 0, n = image.width * image.height; i != n; ++i)
             {

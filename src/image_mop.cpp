@@ -55,7 +55,8 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
     }
 
     const size_t pixel_count = r_image.width * r_image.height;
-    r_image.pixels.resize(pixel_count * pixel_stride);
+    r_image.pixels_size = pixel_count * pixel_stride;
+    r_image.pixels = std::make_unique<char[]>(r_image.pixels_size);
 
     size_t chunk_count = (pixel_count + kChunkSize - 1) / kChunkSize;
     const size_t coded_stride = (pixel_stride + 3) / 4 * 4; // mesh optimizer requires stride to be multiple of 4
@@ -78,7 +79,7 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
         const size_t encSize = chunk_start_size[index].second;
 
         const size_t chunk_pixel_count = index == chunk_count - 1 ? pixel_count - index * kChunkSize : kChunkSize;
-        char* dst_data = r_image.pixels.data() + index * kChunkSize * pixel_stride;
+        char* dst_data = r_image.pixels.get() + index * kChunkSize * pixel_stride;
         if (coded_stride == pixel_stride)
         {
             if (meshopt_decodeVertexBuffer(dst_data, chunk_pixel_count, coded_stride, (const uint8_t*)mem.data() + encStart, encSize) != 0)
@@ -134,7 +135,7 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
     }
 
     const size_t pixel_count = image.width * image.height;
-    const size_t pixel_stride = image.pixels.size() / pixel_count;
+    const size_t pixel_stride = image.pixels_size / pixel_count;
     const size_t coded_stride = (pixel_stride + 3) / 4 * 4; // mesh optimizer requires stride to be multiple of 4
     size_t chunk_count = (pixel_count + kChunkSize - 1) / kChunkSize;
 
@@ -144,7 +145,7 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
         const size_t chunk_pixel_count = index == chunk_count - 1 ? pixel_count - index * kChunkSize : kChunkSize;
         size_t bufSize = meshopt_encodeVertexBufferBound(chunk_pixel_count, coded_stride);
         uint8_t* buf = new uint8_t[bufSize];
-        const char* src_data = image.pixels.data() + index * kChunkSize * pixel_stride;
+        const char* src_data = image.pixels.get() + index * kChunkSize * pixel_stride;
         size_t encSize = 0;
         if (pixel_stride == coded_stride)
         {

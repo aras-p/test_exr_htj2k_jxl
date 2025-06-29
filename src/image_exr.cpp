@@ -34,11 +34,12 @@ bool LoadExrFile(MyIStream &mem, Image& r_image)
         offset += size;
     }
     
-    r_image.pixels.resize(r_image.width * r_image.height * offset);
+    r_image.pixels_size = r_image.width * r_image.height * offset;
+    r_image.pixels = std::make_unique<char[]>(r_image.pixels_size);
     
     Imf::FrameBuffer fb;
     for (const auto& ch : r_image.channels) {
-        char *ptr = r_image.pixels.data() + ch.offset - dw.min.x * offset - dw.min.y * offset * r_image.width;
+        char *ptr = r_image.pixels.get() + ch.offset - dw.min.x * offset - dw.min.y * offset * r_image.width;
         fb.insert(ch.name, Imf::Slice(ch.fp16 ? Imf::HALF : Imf::FLOAT, ptr, offset, offset * r_image.width));
     }
 
@@ -68,11 +69,11 @@ bool SaveExrFile(MyOStream &mem, const Image& image, CompressorType cmp_type, in
             header.zipCompressionLevel() = cmp_level;
     }
     
-    const size_t stride = image.pixels.size() / image.width / image.height;
+    const size_t stride = image.pixels_size / image.width / image.height;
     for (const Image::Channel& ch : image.channels)
     {
         header.channels().insert(ch.name, Imf::Channel(ch.fp16 ? Imf::HALF : Imf::FLOAT));
-        const char *ptr = image.pixels.data() + ch.offset;
+        const char *ptr = image.pixels.get() + ch.offset;
         fb.insert(ch.name, Imf::Slice(ch.fp16 ? Imf::HALF : Imf::FLOAT, (char*)ptr, stride, stride * image.width));
     }
 

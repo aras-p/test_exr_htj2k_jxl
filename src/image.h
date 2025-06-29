@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 #include <stdint.h>
 #include <string>
@@ -25,7 +26,8 @@ struct Image
     };
     size_t width = 0, height = 0;
     std::vector<Channel> channels;
-    std::vector<char> pixels;
+    std::unique_ptr<char[]> pixels;
+    size_t pixels_size = 0;
 };
 
 void SanitizePixelValues(Image& image);

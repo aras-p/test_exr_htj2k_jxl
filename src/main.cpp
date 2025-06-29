@@ -126,8 +126,8 @@ static bool TestFile(const char* file_path, int run_index)
     // even in full lossless mode, see https://github.com/libjxl/libjxl/issues/3881
     SanitizePixelValues(img_in);
 
-    printf("%ix%i, %i channels, %i bytes/pixel (%.1fMB)\n", int(img_in.width), int(img_in.height), int(img_in.channels.size()), int(img_in.pixels.size()/img_in.width/img_in.height), img_in.pixels.size()/1024.0/1024.0);
-    const size_t raw_size = img_in.pixels.size();
+    printf("%ix%i, %i channels, %i bytes/pixel (%.1fMB)\n", int(img_in.width), int(img_in.height), int(img_in.channels.size()), int(img_in.pixels_size/img_in.width/img_in.height), img_in.pixels_size/1024.0/1024.0);
+    const size_t raw_size = img_in.pixels_size;
     
     // test various compression schemes
     for (size_t cmp_index = 0; cmp_index < kTestComprCount; ++cmp_index)
@@ -142,7 +142,7 @@ static bool TestFile(const char* file_path, int run_index)
         MyOStream mem_out;
         if (cmp_type == CompressorType::Raw)
         {
-            mem_out.write(img_in.pixels.data(), (int)img_in.pixels.size());
+            mem_out.write(img_in.pixels.get(), (int)img_in.pixels_size);
         }
         else if (cmp_type == CompressorType::Jxl)
         {
@@ -183,8 +183,9 @@ static bool TestFile(const char* file_path, int run_index)
         {
             img_got.width = img_in.width;
             img_got.height = img_in.height;
-            img_got.pixels.resize(img_in.pixels.size());
-            memcpy(img_got.pixels.data(), mem_got_in.data(), img_got.pixels.size());
+            img_got.pixels = std::make_unique<char[]>(img_in.pixels_size);
+            img_got.pixels_size = img_in.pixels_size;
+            memcpy(img_got.pixels.get(), mem_got_in.data(), img_got.pixels_size);
         }
         else if (cmp_type == CompressorType::Jxl)
         {

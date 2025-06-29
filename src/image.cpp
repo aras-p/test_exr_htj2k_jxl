@@ -2,8 +2,8 @@
 
 void SanitizePixelValues(Image& image)
 {
-    const size_t pixel_stride = image.pixels.size() / image.width / image.height;
-    const char* ptr = image.pixels.data();
+    const size_t pixel_stride = image.pixels_size / image.width / image.height;
+    const char* ptr = image.pixels.get();
     for (size_t i = 0, n = image.width * image.height; i != n; ++i)
     {
         for (const Image::Channel& ch : image.channels)
@@ -30,9 +30,9 @@ bool CompareImages(const Image& ia, const Image& ib)
         printf("ERROR: image sizes do not match: exp %zix%zi %zich, got %zix%zi %zich\n", ia.width, ia.height, ia.channels.size(), ib.width, ib.height, ib.channels.size());
         return false;
     }
-    if (ia.pixels.size() != ib.pixels.size())
+    if (ia.pixels_size != ib.pixels_size)
     {
-        printf("ERROR: image pixel sizes do not match: exp %zi, got %zi\n", ia.pixels.size(), ib.pixels.size());
+        printf("ERROR: image pixel sizes do not match: exp %zi, got %zi\n", ia.pixels_size, ib.pixels_size);
         return false;
     }
     
@@ -65,9 +65,9 @@ bool CompareImages(const Image& ia, const Image& ib)
     }
 
     // compare pixel values
-    const size_t pixel_stride = ia.pixels.size() / ia.width / ia.height;
-    const char* ptra = ia.pixels.data();
-    const char* ptrb = ib.pixels.data();
+    const size_t pixel_stride = ia.pixels_size / ia.width / ia.height;
+    const char* ptra = ia.pixels.get();
+    const char* ptrb = ib.pixels.get();
     int error_count = 0;
     for (size_t i = 0, n = ia.width * ia.height; i != n; ++i)
     {
