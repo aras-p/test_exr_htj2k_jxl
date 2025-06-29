@@ -5,6 +5,8 @@
 
 #include "image_jxl.h"
 
+#include <string.h>
+
 static JxlThreadParallelRunnerPtr s_jxl_runner;
 
 void InitJxl(int thread_count)

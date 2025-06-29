@@ -8,6 +8,10 @@
 #ifdef _MSC_VER
 #include <windows.h>
 #endif
+#ifdef __linux
+#include <string.h>
+#include <stdio.h>
+#endif
 
 std::string sysinfo_getplatform()
 {
@@ -15,6 +19,8 @@ std::string sysinfo_getplatform()
     return "macOS";
     #elif defined _MSC_VER
     return "Windows";
+    #elif defined __linux
+    return "Linux";
     #else
     #error Unknown platform
     #endif
@@ -46,6 +52,27 @@ std::string sysinfo_getcpumodel()
 		}
 	}
 	return "Unknown";
+    #elif defined __linux
+	std::string result = "Unknown";
+
+	FILE* file = fopen("/proc/cpuinfo", "r");
+	if (!file)
+		return result;
+
+	char line[1024];
+	while (fgets(line, sizeof(line), file))
+	{
+		if (strncmp(line, "model name\t: ", 13) == 0)
+		{
+			result = line + 13;
+			if (!result.empty() && result.back() == '\n')
+				result.pop_back();
+			break;
+		}
+	}
+
+	fclose(file);
+	return result;
     #else
     #error Unknown platform
     #endif
