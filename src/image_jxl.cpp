@@ -115,12 +115,12 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
             total_buffer_size = r_image.width * r_image.height * offset;
             if (extra_non_alpha_channels == 0)
             {
-                r_image.pixels = std::make_unique<char[]>(total_buffer_size);
+                r_image.pixels = std::unique_ptr<char[]>(new char[total_buffer_size]);
                 r_image.pixels_size = total_buffer_size;
             }
             else
             {
-                planar_buffer = std::make_unique<uint8_t[]>(total_buffer_size);
+                planar_buffer = std::unique_ptr<uint8_t[]>(new uint8_t[total_buffer_size]);
             }
         }
         else if (status == JXL_DEC_FRAME)
@@ -202,7 +202,7 @@ bool LoadJxlFile(MyIStream &mem, Image& r_image)
         // into destination, with scattered reads (i.e. order is "for all pixels,
         // for all channels") than it is to do linear reads, scattered writes
         // ("for all channels, for all pixels").
-        r_image.pixels = std::make_unique<char[]>(total_buffer_size);
+        r_image.pixels = std::unique_ptr<char[]>(new char[total_buffer_size]);
         r_image.pixels_size = total_buffer_size;
         const uint8_t* src_ptr = planar_buffer.get();
         const size_t pixel_stride = total_buffer_size / r_image.width / r_image.height;
