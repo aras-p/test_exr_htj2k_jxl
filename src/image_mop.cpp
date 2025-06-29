@@ -47,7 +47,7 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
             Image::Channel ch = {};
             ch.fp16 = type == 0;
             ch.name.resize(nameLen);
-            mem.read(ch.name.data(), ch.name.size());
+            mem.read(ch.name.data(), int(ch.name.size()));
             ch.offset = pixel_stride;
             pixel_stride += ch.fp16 ? 2 : 4;
             r_image.channels.emplace_back(ch);
@@ -73,7 +73,7 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
     }
 
     bool ok = true;
-    ic::pfor(chunk_count, 1, [&](int index) {
+    ic::pfor(unsigned(chunk_count), 1, [&](int index) {
         const size_t encStart = chunk_start_size[index].first;
         const size_t encSize = chunk_start_size[index].second;
 
@@ -129,7 +129,7 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
             int32_t nameLen = int32_t(ch.name.size());
             mem.write(type);
             mem.write(nameLen);
-            mem.write(ch.name.c_str(), ch.name.size());
+            mem.write(ch.name.c_str(), int(ch.name.size()));
         }
     }
 
@@ -140,7 +140,7 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
 
     std::vector<std::pair<uint8_t*, size_t>> encoded_chunks(chunk_count);
 
-    ic::pfor(chunk_count, 1, [&](int index) {
+    ic::pfor(unsigned(chunk_count), 1, [&](int index) {
         const size_t chunk_pixel_count = index == chunk_count - 1 ? pixel_count - index * kChunkSize : kChunkSize;
         size_t bufSize = meshopt_encodeVertexBufferBound(chunk_pixel_count, coded_stride);
         uint8_t* buf = new uint8_t[bufSize];
@@ -180,7 +180,7 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
     }
     for (std::pair<uint8_t*, size_t>& chunk : encoded_chunks)
     {
-        mem.write((const char*)chunk.first, chunk.second);
+        mem.write((const char*)chunk.first, int(chunk.second));
         delete[] chunk.first;
     }
     return true;

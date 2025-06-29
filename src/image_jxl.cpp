@@ -545,6 +545,6 @@ bool SaveJxlFile(MyOStream& mem, const Image& image, int cmp_level)
     }
 
     // output
-    mem.write((const char*)compressed.data(), next_out - compressed.data());
+    mem.write((const char*)compressed.data(), int(next_out - compressed.data()));
     return true;
 }
