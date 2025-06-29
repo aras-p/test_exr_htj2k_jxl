@@ -23,7 +23,7 @@ namespace ic {
     void shut_pfor();
 
     // Invoke the given function pointer in parallel with idx values in the [0,count) range.
-    typedef void ForTask(void * context, int idx);
+    typedef void ForTask(void * context, int idx, int tid);
     void pfor_run (ForTask * task, void * context, unsigned int count, unsigned int step = 1);
 
 #if IC_CC_LAMBDAS
@@ -32,9 +32,9 @@ namespace ic {
     template <typename F>
     void pfor(unsigned int count, unsigned int step, F f) {
         // Transform lambda into function pointer.
-        auto lambda = [](void* context, int idx) {
+        auto lambda = [](void* context, int idx, int tid) {
             F & f = *reinterpret_cast<F *>(context);
-            f(idx);
+            f(idx, tid);
         };
 
         pfor_run(lambda, &f, count, step);
@@ -651,6 +651,9 @@ void shut_pfor() {
     }
 }
 
+int pfor_workers() {
+    return pool.worker_count;
+}
 
 ////////////////////////////////////////////////////////
 // Parallel For
@@ -675,7 +678,7 @@ static void pf_func(void * arg, int tid) {
 
         const uint count = min(pf.count, new_idx + pf.step);
         for (uint i = new_idx; i < count; i++) {
-            pf.func(pf.ctx, i);
+            pf.func(pf.ctx, i, tid);
         }
     }
 }
