@@ -81,7 +81,11 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
 
     bool ok = true;
     // if we need to add padding, reuse the padding buffers between work item invocations
-    std::vector <std::pair<std::unique_ptr<char[]>, size_t>> thread_buffers(s_mop_thread_count);
+    std::unique_ptr<char[]> padded_buffer;
+    if (coded_stride != pixel_stride)
+    {
+        padded_buffer.reset(new char[s_mop_thread_count * kChunkSize * coded_stride]);
+    }
 
     ic::pfor(unsigned(chunk_count), 1, [&](int index, int thread_index) {
         const size_t encStart = chunk_start_size[index].first;
@@ -99,20 +103,13 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
         }
         else
         {
-            const size_t needed_size = chunk_pixel_count * coded_stride;
-            assert(thread_index >= 0 && thread_index < thread_buffers.size());
-            if (thread_buffers[thread_index].second < needed_size)
-            {
-                thread_buffers[thread_index].first = std::unique_ptr<char[]>(new char[chunk_pixel_count * coded_stride]);
-                thread_buffers[thread_index].second = needed_size;
-            }
-
-            if (meshopt_decodeVertexBuffer(thread_buffers[thread_index].first.get(), chunk_pixel_count, coded_stride, (const uint8_t*)mem.data() + encStart, encSize) != 0)
+            char* padded_data = padded_buffer.get() + kChunkSize * coded_stride * thread_index;
+            if (meshopt_decodeVertexBuffer(padded_data, chunk_pixel_count, coded_stride, (const uint8_t*)mem.data() + encStart, encSize) != 0)
             {
                 ok = false;
                 return;
             }
-            const char* src = thread_buffers[thread_index].first.get();
+            const char* src = padded_data;
             char* dst = dst_data;
             for (size_t i = 0; i < chunk_pixel_count; ++i)
             {
@@ -156,7 +153,11 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
     std::vector<std::pair<uint8_t*, size_t>> encoded_chunks(chunk_count);
 
     // if we need to add padding, reuse the padding buffers between work item invocations
-    std::vector <std::pair<std::unique_ptr<char[]>, size_t>> thread_buffers(s_mop_thread_count);
+    std::unique_ptr<char[]> padded_buffer;
+    if (coded_stride != pixel_stride)
+    {
+        padded_buffer.reset(new char[s_mop_thread_count * kChunkSize * coded_stride]);
+    }
 
     ic::pfor(unsigned(chunk_count), 1, [&](int index, int thread_index) {
         const size_t chunk_pixel_count = index == chunk_count - 1 ? pixel_count - index * kChunkSize : kChunkSize;
@@ -173,15 +174,7 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
         }
         else
         {
-            const size_t needed_size = chunk_pixel_count * coded_stride;
-            assert(thread_index >= 0 && thread_index < thread_buffers.size());
-            if (thread_buffers[thread_index].second < needed_size)
-            {
-                thread_buffers[thread_index].first = std::unique_ptr<char[]>(new char[chunk_pixel_count * coded_stride]);
-                thread_buffers[thread_index].second = needed_size;
-            }
-
-            char* padded_data = thread_buffers[thread_index].first.get();
+            char* padded_data = padded_buffer.get() + kChunkSize * coded_stride * thread_index;
             const char* src = src_data;
             char* dst = padded_data;
             for (size_t i = 0; i < chunk_pixel_count; ++i)
