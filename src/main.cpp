@@ -450,6 +450,10 @@ int main(int argc, const char** argv)
                res.tRead,
                perfRead);
     }
-    
+
+#ifdef INCLUDE_FORMAT_MOP
+    ShutdownMop();
+#endif
+
     return 0;
 }
