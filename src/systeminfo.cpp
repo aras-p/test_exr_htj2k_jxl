@@ -2,6 +2,9 @@
 #include "systeminfo.h"
 
 #include <time.h>
+#include <set>
+#include <thread>
+#include <vector>
 #ifdef __APPLE__
 #include <sys/sysctl.h>
 #endif
@@ -25,6 +28,66 @@ std::string sysinfo_getplatform()
     #error Unknown platform
     #endif
 }
+
+unsigned int sysinfo_getcpuphysicalcores()
+{
+#if defined(_MSC_VER)
+    DWORD length = 0;
+    if (!::GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &length) && ::GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+        return 1;
+    std::vector<uint8_t> buffer(length);
+    if (!::GetLogicalProcessorInformationEx(RelationProcessorCore, (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)buffer.data(), &length))
+        return 1;
+
+    unsigned int cores = 0;
+    DWORD offset = 0;
+    while (offset < length)
+    {
+        SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* info = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)(buffer.data() + offset);
+        if (info->Relationship == RelationProcessorCore) {
+            ++cores;
+        }
+        offset += info->Size;
+    }
+    return cores;
+#elif defined(__APPLE__)
+    unsigned int cores = 1;
+    size_t len = sizeof(cores);
+    int err = ::sysctlbyname("hw.physicalcpu", &cores, &len, 0, 0);
+    return err == 0 ? cores : 1;
+#elif defined __linux
+    FILE* file = fopen("/proc/cpuinfo", "r");
+    if (!file)
+        return 1;
+    char line[1024];
+    std::set<std::pair<int, int>> core_set;
+    int physical_id = -1;
+    int core_id = -1;
+
+    while (fgets(line, sizeof(line), file))
+    {
+        if (strncmp(line, "physical id", 11) == 0)
+        {
+            physical_id = std::atoi(strchr(line, ':') + 1);
+        }
+        else if (strncmp(line, "core id", 7) == 0)
+        {
+            core_id = std::atoi(strchr(line, ':') + 1);
+            if (physical_id >= 0 && core_id >= 0)
+            {
+                core_set.emplace(physical_id, core_id);
+                physical_id = -1;
+                core_id = -1;
+            }
+        }
+    }
+    fclose(file);
+    return (unsigned int)core_set.size();
+#else
+	return std::thread::hardware_concurrency();
+#endif
+}
+
 
 std::string sysinfo_getcpumodel()
 {

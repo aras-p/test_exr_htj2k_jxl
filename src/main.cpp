@@ -62,7 +62,7 @@ static const CompressorDesc kTestCompr[] =
     //{ 0, 0 }, // just raw bits read/write
     
     // EXR
-#ifdef INCLUDE_FORMAT_EXR
+#if defined(INCLUDE_FORMAT_EXR)
     //{ 1, 0 }, // None
     { 2, 0 }, // RLE
     { 3, 0 }, // PIZ
@@ -76,7 +76,7 @@ static const CompressorDesc kTestCompr[] =
 #endif 
     
     // JXL
-#ifdef INCLUDE_FORMAT_JXL
+#if defined(INCLUDE_FORMAT_JXL)
     { 6, 1 },
     { 6, 3 },
     { 6, 4 },
@@ -85,7 +85,7 @@ static const CompressorDesc kTestCompr[] =
 #endif
 
     // Mop
-#ifdef INCLUDE_FORMAT_MOP
+#if defined(INCLUDE_FORMAT_MOP)
     { 7, 0 },
     { 7, 1 },
     { 7, 2 }, // default level 2
@@ -383,7 +383,7 @@ int main(int argc, const char** argv)
         printf("USAGE: test_exr_htj2k_jxl <input exr files>\n");
         return 1;
     }
-    unsigned nThreads = std::thread::hardware_concurrency();
+    unsigned nThreads = sysinfo_getcpuphysicalcores();
 //#ifdef _DEBUG
 //    nThreads = 0;
 //#endif
