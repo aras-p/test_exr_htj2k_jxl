@@ -80,6 +80,7 @@ Size increase of Win x64 statically linked executable, for each of the compressi
 - EXR HTJ2K: +308 KB. _Okay._
 - JPEG-XL: +6017 KB. _Big!_
 - mesh optimizer: +26 KB. _Tiny!_
+- mesh optimizer + zstd: +431 KB. _Okay._
 
 ### Files I am testing on
 
