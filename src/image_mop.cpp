@@ -1,5 +1,6 @@
 
 #include <meshoptimizer.h>
+#include <zstd.h>
 
 #include "image_mop.h"
 #include "fileio.h"
@@ -21,9 +22,23 @@ void ShutdownMop()
     ic::shut_pfor();
 }
 
+// File format:
+// uchar4   magic MOPF
+// int32    width
+// int32    height
+// int32    flags 1=zstd
+// int32    nchannels
+// for nchannels:
+//      int32   type (0=fp16, 1=fp32)
+//      int32   namelen
+//      char[namelen] name
+// int64[chunkcount] compressed chunk sizes
+
+
 bool LoadMopFile(MyIStream &mem, Image& r_image)
 {
     size_t pixel_stride = 0;
+    bool zstd = false;
 
     // header
     {
@@ -31,9 +46,12 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
         mem.read(magic);
         if (memcmp(magic, "MOPF", 4) != 0)
             return false;
-        int32_t width = 0, height = 0, chCount = 0;
+        int32_t width = 0, height = 0, flags = 0, chCount = 0;
         mem.read(width);
         mem.read(height);
+        mem.read(flags);
+        if (flags & 1)
+            zstd = true;
         mem.read(chCount);
         if (width < 1 || width > 1024 * 1024 * 1024 || height < 1 || height > 1024 * 1024 * 1024 || chCount < 1 || chCount > 1024 * 1024)
             return false;
@@ -90,12 +108,24 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
     ic::pfor(unsigned(chunk_count), 1, [&](int index, int thread_index) {
         const size_t encStart = chunk_start_size[index].first;
         const size_t encSize = chunk_start_size[index].second;
+        
+        const uint8_t* decode_src = (const uint8_t*)mem.data() + encStart;
+        size_t decode_size = encSize;
+        std::unique_ptr<uint8_t[]> z_buf;
+        if (zstd)
+        {
+            const size_t z_size = ZSTD_getFrameContentSize(decode_src, decode_size);
+            z_buf = std::unique_ptr<uint8_t[]>(new uint8_t[z_size]);
+            ZSTD_decompress(z_buf.get(), z_size, decode_src, decode_size);
+            decode_src = z_buf.get();
+            decode_size = z_size;
+        }
 
         const size_t chunk_pixel_count = index == chunk_count - 1 ? pixel_count - index * kChunkSize : kChunkSize;
         char* dst_data = r_image.pixels.get() + index * kChunkSize * pixel_stride;
         if (coded_stride == pixel_stride)
         {
-            if (meshopt_decodeVertexBuffer(dst_data, chunk_pixel_count, coded_stride, (const uint8_t*)mem.data() + encStart, encSize) != 0)
+            if (meshopt_decodeVertexBuffer(dst_data, chunk_pixel_count, coded_stride, decode_src, decode_size) != 0)
             {
                 ok = false;
                 return;
@@ -104,7 +134,7 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
         else
         {
             char* padded_data = padded_buffer.get() + kChunkSize * coded_stride * thread_index;
-            if (meshopt_decodeVertexBuffer(padded_data, chunk_pixel_count, coded_stride, (const uint8_t*)mem.data() + encStart, encSize) != 0)
+            if (meshopt_decodeVertexBuffer(padded_data, chunk_pixel_count, coded_stride, decode_src, decode_size) != 0)
             {
                 ok = false;
                 return;
@@ -125,6 +155,8 @@ bool LoadMopFile(MyIStream &mem, Image& r_image)
 
 bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
 {
+    const bool zstd = cmp_level >= 1<<8;
+    const int mop_level = cmp_level & 0xFF;
     // header
     {
         const char magic[] = {'M', 'O', 'P', 'F'};
@@ -132,8 +164,12 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
         int32_t width = int32_t(image.width);
         int32_t height = int32_t(image.height);
         int32_t chCount = int32_t(image.channels.size());
+        int32_t flags = 0;
+        if (zstd)
+            flags |= 1;
         mem.write(width);
         mem.write(height);
+        mem.write(flags);
         mem.write(chCount);
         for (const Image::Channel& ch : image.channels)
         {
@@ -164,13 +200,13 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
         size_t bufSize = meshopt_encodeVertexBufferBound(chunk_pixel_count, coded_stride);
         uint8_t* buf = new uint8_t[bufSize];
         const char* src_data = image.pixels.get() + index * kChunkSize * pixel_stride;
-        size_t encSize = 0;
+        size_t enc_size = 0;
         if (pixel_stride == coded_stride)
         {
-            encSize = meshopt_encodeVertexBufferLevel(
+            enc_size = meshopt_encodeVertexBufferLevel(
                 buf, bufSize,
                 src_data, chunk_pixel_count, coded_stride,
-                cmp_level, 1);
+                mop_level, 1);
         }
         else
         {
@@ -184,12 +220,23 @@ bool SaveMopFile(MyOStream &mem, const Image& image, int cmp_level)
                 memset(dst + pixel_stride, 0, coded_stride - pixel_stride);
                 dst += coded_stride;
             }
-            encSize = meshopt_encodeVertexBufferLevel(
+            enc_size = meshopt_encodeVertexBufferLevel(
                 buf, bufSize,
                 padded_data, chunk_pixel_count, coded_stride,
-                cmp_level, 1);
+                mop_level, 1);
         }
-        encoded_chunks[index] = { buf, encSize };
+        
+        if (zstd)
+        {
+            const size_t z_bound = ZSTD_compressBound(enc_size);
+            uint8_t* z_buf = new uint8_t[z_bound];
+            const int z_level = cmp_level >> 8;
+            const size_t z_size = ZSTD_compress(z_buf, z_bound, buf, enc_size, z_level);
+            delete[] buf;
+            buf = z_buf;
+            enc_size = z_size;
+        }
+        encoded_chunks[index] = { buf, enc_size };
         });
 
     for (std::pair<uint8_t*, size_t>& chunk : encoded_chunks)

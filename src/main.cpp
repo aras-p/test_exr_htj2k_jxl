@@ -81,15 +81,21 @@ static const CompressorDesc kTestCompr[] =
     { 6, 3 },
     { 6, 4 },
     { 6, 7 }, // default level 7
-    //{ 6, 9 },
+    { 6, 8 },
 #endif
 
     // Mop
 #if defined(INCLUDE_FORMAT_MOP)
+    // just mesh optimizer
     { 7, 0 },
     { 7, 1 },
     { 7, 2 }, // default level 2
     { 7, 3 },
+    // coupled with zstd
+    { 7, 2 | (1<<8) }, // mop 2, zstd 1
+    { 7, 2 | (3<<8) }, // mop 2, zstd 3
+    { 7, 2 | (10<<8) }, // mop 2, zstd 10
+    { 7, 3 | (20<<8) }, // mop 3, zstd 20
 #endif
 };
 constexpr size_t kTestComprCount = sizeof(kTestCompr) / sizeof(kTestCompr[0]);
@@ -246,7 +252,9 @@ static void WriteReportRow(FILE* fout, uint64_t gotTypeMask, size_t cmpIndex, do
         fprintf(fout, ",null,null");
     }
     fprintf(fout, ",%.2f,'", yval);
-    if (cmpLevel != 0 || typeIndex == (int)CompressorType::Mop)
+    if (typeIndex == (int)CompressorType::Mop && cmpLevel >= 1<<8)
+        fprintf(fout, "%s%i/%i", cmpName, cmpLevel&0xFF, cmpLevel>>8);
+    else if (cmpLevel != 0 || typeIndex == (int)CompressorType::Mop)
         fprintf(fout, "%s%i", cmpName, cmpLevel);
     else
         fprintf(fout, "%s", cmpName);
@@ -342,7 +350,7 @@ R"(var options = {
     fprintf(fout,
 R"(        100:{}},
     hAxis: {title: 'Compression ratio', viewWindow: {min:1.0,max:3.0}},
-    vAxis: {title: 'Compression, GB/s', viewWindow: {min:0, max:15.0}},
+    vAxis: {title: 'Compression, GB/s', viewWindow: {min:0, max:6.0}},
     chartArea: {left:60, right:10, top:50, bottom:50},
     legend: {position: 'top'},
     colors: [
@@ -367,7 +375,7 @@ chw.draw(dw, options);
 
 options.title = 'Decompression';
 options.vAxis.title = 'Decompression, GB/s';
-options.vAxis.viewWindow.max = 15.0;
+options.vAxis.viewWindow.max = 16.0;
 var chr = new google.visualization.ScatterChart(document.getElementById('chart_r'));
 chr.draw(dr, options);
 }

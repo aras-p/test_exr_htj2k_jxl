@@ -63,6 +63,21 @@ if (INCLUDE_FORMAT_MOP)
     )
     option(MESHOPT_INSTALL "" OFF)
     FetchContent_MakeAvailable(meshoptimizer)
+    
+    # zstd
+    FetchContent_Declare(
+        zstd
+        URL https://github.com/facebook/zstd/archive/refs/tags/v1.5.7.zip # latest (2025 Feb) at time of writing
+        SOURCE_SUBDIR build/cmake
+    )
+    set(ZSTD_LEGACY_SUPPORT OFF)
+    set(ZSTD_MULTITHREAD_SUPPORT OFF)
+    set(ZSTD_BUILD_TESTS OFF)
+    set(ZSTD_BUILD_PROGRAMS OFF)
+    set(ZSTD_BUILD_CONTRIB OFF)
+    set(ZSTD_BUILD_STATIC ON)
+    set(ZSTD_BUILD_SHARED OFF)
+    FetchContent_MakeAvailable(zstd)
 endif()
 
 project ("test_exr_htj2k_jxl")
@@ -77,6 +92,7 @@ set (SOURCES
     src/systeminfo.cpp
 )
 set (LIBS )
+set (INCLUDES )
 set (DEFINES CRT_SECURE_NO_DEPRECATE _CRT_NONSTDC_NO_WARNINGS NOMINMAX)
 if (INCLUDE_FORMAT_EXR)
     list(APPEND SOURCES src/image_exr.cpp src/image_exr.h)
@@ -90,10 +106,12 @@ if (INCLUDE_FORMAT_JXL)
 endif()
 if (INCLUDE_FORMAT_MOP)
     list(APPEND SOURCES src/image_mop.cpp src/image_mop.h)
-    list(APPEND LIBS meshoptimizer)
+    list(APPEND LIBS meshoptimizer libzstd_static)
+    list(APPEND INCLUDES ${zstd_SOURCE_DIR}/lib)
     list(APPEND DEFINES INCLUDE_FORMAT_MOP)
 endif()
 add_executable (test_exr_htj2k_jxl ${SOURCES})
 target_link_libraries(test_exr_htj2k_jxl PRIVATE ${LIBS})
+target_include_directories(test_exr_htj2k_jxl PRIVATE ${INCLUDES})
 set_property(TARGET test_exr_htj2k_jxl PROPERTY CXX_STANDARD 17)
 target_compile_definitions(test_exr_htj2k_jxl PRIVATE ${DEFINES} $<$<CONFIG:Debug>:_DEBUG>)
