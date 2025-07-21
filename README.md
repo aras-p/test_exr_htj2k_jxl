@@ -1,5 +1,7 @@
 # OpenEXR, HTJ2K, JPEG-XL et al. comparison for lossless compression of half/float images
 
+**Blog post about all of this**: https://aras-p.info/blog/2025/07/08/Lossless-Float-Image-Compression/
+
 A quick test for various *lossless* compression modes of floating point images. Traditionally
 OpenEXR has been the go-to format for that; here I compare several existing lossless compression
 modes in it (ZIP, PIZ, RLE), as well as others:
