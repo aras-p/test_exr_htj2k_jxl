@@ -45,9 +45,10 @@ static const CompressorTypeDesc kComprTypes[] =
     {"RLE",     CompressorType::ExrRLE,     "6080a0", 0}, // 2, gray-ish
     {"PIZ",     CompressorType::ExrPIZ,     "ff9a44", 0}, // 3, orange
     {"Zip",     CompressorType::ExrZIP,     "12b520", 0}, // 4, green
-    {"HTJ2K",   CompressorType::ExrHTJ2K,   "0094ef", 0}, // 5, blue
-	{"JXL",     CompressorType::Jxl,        "e01010", 0}, // 6, red
-    {"Mop",     CompressorType::Mop,        "ac74d0", 0}, // 7, magenta-ish
+    {"HTJ2K_32",CompressorType::ExrHTJ2K_32,"0094ef", 0}, // 5, blue
+    {"HTJ2K_256",CompressorType::ExrHTJ2K_256,"0094ef", 0}, // 6, blue
+    {"JXL",     CompressorType::Jxl,        "e01010", 0}, // 7, red
+    {"Mop",     CompressorType::Mop,        "ac74d0", 0}, // 8, magenta-ish
 };
 constexpr size_t kComprTypeCount = sizeof(kComprTypes) / sizeof(kComprTypes[0]);
 
@@ -72,30 +73,31 @@ static const CompressorDesc kTestCompr[] =
     //{ 4, 6 },
     //{ 4, 9 },
 
-    { 5, 0 }, // HTJ2K
+    { 5, 0 }, // HTJ2K_32
+    { 6, 0 }, // HTJ2K_256
 #endif 
     
     // JXL
 #if defined(INCLUDE_FORMAT_JXL)
-    { 6, 1 },
-    { 6, 3 },
-    { 6, 4 },
-    { 6, 7 }, // default level 7
-    { 6, 8 },
+    { 7, 1 },
+    { 7, 3 },
+    { 7, 4 },
+    { 7, 7 }, // default level 7
+    { 7, 8 },
 #endif
 
     // Mop
 #if defined(INCLUDE_FORMAT_MOP)
     // just mesh optimizer
-    { 7, 0 },
-    { 7, 1 },
-    { 7, 2 }, // default level 2
-    { 7, 3 },
+    { 8, 0 },
+    { 8, 1 },
+    { 8, 2 }, // default level 2
+    { 8, 3 },
     // coupled with zstd
-    { 7, 2 | (1<<8) }, // mop 2, zstd 1
-    { 7, 2 | (3<<8) }, // mop 2, zstd 3
-    { 7, 2 | (10<<8) }, // mop 2, zstd 10
-    { 7, 3 | (20<<8) }, // mop 3, zstd 20
+    { 8, 2 | (1<<8) }, // mop 2, zstd 1
+    { 8, 2 | (3<<8) }, // mop 2, zstd 3
+    { 8, 2 | (10<<8) }, // mop 2, zstd 10
+    { 8, 3 | (20<<8) }, // mop 3, zstd 20
 #endif
 };
 constexpr size_t kTestComprCount = sizeof(kTestCompr) / sizeof(kTestCompr[0]);

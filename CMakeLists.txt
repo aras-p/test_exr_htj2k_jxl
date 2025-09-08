@@ -15,7 +15,7 @@ option(BUILD_SHARED_LIBS "" OFF)
 if (INCLUDE_FORMAT_EXR)
     FetchContent_Declare(
 	    openexr
-        URL https://github.com/AcademySoftwareFoundation/openexr/archive/45ee12752f9c26f601e21a5e7b782f6dbf857271.zip # 2025 Jun, post-3.3.4 with HTJ2K compression
+        URL https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/v3.4.0.zip # 2025 Sep (3.4.0), latest at time of writing
     )
     option(BUILD_TESTING "" OFF)
     option(OPENEXR_BUILD_TOOLS "" OFF)
@@ -33,7 +33,7 @@ if (INCLUDE_FORMAT_JXL)
     FetchContent_Declare(
         libjxl
         GIT_REPOSITORY https://github.com/libjxl/libjxl.git
-        GIT_TAG main # 2025 Jun, latest at time of writing
+        GIT_TAG main # 2025 Sep, latest at time of writing
         GIT_SHALLOW TRUE
         GIT_PROGRESS TRUE
         GIT_SUBMODULES_RECURSE TRUE
@@ -59,7 +59,7 @@ endif()
 if (INCLUDE_FORMAT_MOP)
     FetchContent_Declare(
 	    meshoptimizer
-	    URL https://github.com/zeux/meshoptimizer/archive/refs/tags/v0.24.zip # latest (2025 Jun) at time of writing
+	    URL https://github.com/zeux/meshoptimizer/archive/refs/tags/v0.25.zip # latest (2025 Aug) at time of writing
     )
     option(MESHOPT_INSTALL "" OFF)
     FetchContent_MakeAvailable(meshoptimizer)

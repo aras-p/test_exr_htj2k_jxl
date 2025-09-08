@@ -12,7 +12,8 @@ enum class CompressorType
     ExrRLE,
     ExrPIZ,
     ExrZIP,
-    ExrHTJ2K,
+    ExrHTJ2K_32,
+    ExrHTJ2K_256,
     Jxl,
     Mop,
 };

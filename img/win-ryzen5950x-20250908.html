@@ -1,0 +1,99 @@
+<script type='text/javascript' src='https://www.gstatic.com/charts/loader.js'></script>
+<center style='font-family: Arial;'>
+<p><b>EXR/JXL compression ratio vs throughput</b>, 10 files (3122.4MB) <span style='color: #ccc'>20250908, 3 runs</span</p>
+<div style='border: 1px solid #ccc;'>
+<div id='chart_w' style='width: 640px; height: 640px; display:inline-block;'></div>
+<div id='chart_r' style='width: 640px; height: 640px; display:inline-block;'></div>
+</div>
+<p>Windows, AMD Ryzen 9 5950X 16-Core Processor            , 16 threads</p>
+<script type='text/javascript'>
+google.charts.load('current', {'packages':['corechart']});
+google.charts.setOnLoadCallback(drawChart);
+function drawChart() {
+var dw = new google.visualization.DataTable();
+var dr = new google.visualization.DataTable();
+dw.addColumn('number', 'Ratio');
+dr.addColumn('number', 'Ratio');
+dw.addColumn('number', 'RLE'); dw.addColumn({type:'string', role:'tooltip'});
+dr.addColumn('number', 'RLE'); dr.addColumn({type:'string', role:'tooltip'});
+dw.addColumn('number', 'PIZ'); dw.addColumn({type:'string', role:'tooltip'});
+dr.addColumn('number', 'PIZ'); dr.addColumn({type:'string', role:'tooltip'});
+dw.addColumn('number', 'Zip'); dw.addColumn({type:'string', role:'tooltip'});
+dr.addColumn('number', 'Zip'); dr.addColumn({type:'string', role:'tooltip'});
+dw.addColumn('number', 'HTJ2K_32'); dw.addColumn({type:'string', role:'tooltip'});
+dr.addColumn('number', 'HTJ2K_32'); dr.addColumn({type:'string', role:'tooltip'});
+dw.addColumn('number', 'HTJ2K_256'); dw.addColumn({type:'string', role:'tooltip'});
+dr.addColumn('number', 'HTJ2K_256'); dr.addColumn({type:'string', role:'tooltip'});
+dw.addColumn('number', 'JXL'); dw.addColumn({type:'string', role:'tooltip'});
+dr.addColumn('number', 'JXL'); dr.addColumn({type:'string', role:'tooltip'});
+dw.addColumn('number', 'Mop'); dw.addColumn({type:'string', role:'tooltip'});
+dr.addColumn('number', 'Mop'); dr.addColumn({type:'string', role:'tooltip'});
+dw.addRows([
+[1.173,1.63,'RLE: 1.173 ratio, 1.632 GB/s',null,null,null,null,null,null,null,null,null,null,null,null],
+[1.785,null,null,1.01,'PIZ: 1.785 ratio, 1.006 GB/s',null,null,null,null,null,null,null,null,null,null],
+[1.873,null,null,null,null,1.17,'Zip4: 1.873 ratio, 1.172 GB/s',null,null,null,null,null,null,null,null],
+[1.922,null,null,null,null,null,null,0.64,'HTJ2K_32: 1.922 ratio, 0.642 GB/s',null,null,null,null,null,null],
+[1.947,null,null,null,null,null,null,null,null,0.71,'HTJ2K_256: 1.947 ratio, 0.709 GB/s',null,null,null,null],
+[1.905,null,null,null,null,null,null,null,null,null,null,0.24,'JXL1: 1.905 ratio, 0.240 GB/s',null,null],
+[1.940,null,null,null,null,null,null,null,null,null,null,0.22,'JXL3: 1.940 ratio, 0.216 GB/s',null,null],
+[2.090,null,null,null,null,null,null,null,null,null,null,0.13,'JXL4: 2.090 ratio, 0.131 GB/s',null,null],
+[2.180,null,null,null,null,null,null,null,null,null,null,0.05,'JXL7: 2.180 ratio, 0.050 GB/s',null,null],
+[2.434,null,null,null,null,null,null,null,null,null,null,0.01,'JXL8: 2.434 ratio, 0.007 GB/s',null,null],
+[1.907,null,null,null,null,null,null,null,null,null,null,null,null,1.85,'Mop0: 1.907 ratio, 1.846 GB/s'],
+[1.966,null,null,null,null,null,null,null,null,null,null,null,null,2.00,'Mop1: 1.966 ratio, 2.004 GB/s'],
+[2.011,null,null,null,null,null,null,null,null,null,null,null,null,1.60,'Mop2: 2.011 ratio, 1.600 GB/s'],
+[2.028,null,null,null,null,null,null,null,null,null,null,null,null,1.37,'Mop3: 2.028 ratio, 1.371 GB/s'],
+[2.248,null,null,null,null,null,null,null,null,null,null,null,null,1.53,'Mop2/1: 2.248 ratio, 1.533 GB/s'],
+[2.301,null,null,null,null,null,null,null,null,null,null,null,null,1.25,'Mop2/3: 2.301 ratio, 1.254 GB/s'],
+[2.316,null,null,null,null,null,null,null,null,null,null,null,null,0.38,'Mop2/10: 2.316 ratio, 0.377 GB/s'],
+[2.340,null,null,null,null,null,null,null,null,null,null,null,null,0.17,'Mop3/20: 2.340 ratio, 0.166 GB/s']
+]);
+dr.addRows([
+[1.173,4.49,'RLE: 1.173 ratio, 4.488 GB/s',null,null,null,null,null,null,null,null,null,null,null,null],
+[1.785,null,null,1.95,'PIZ: 1.785 ratio, 1.955 GB/s',null,null,null,null,null,null,null,null,null,null],
+[1.873,null,null,null,null,2.53,'Zip4: 1.873 ratio, 2.526 GB/s',null,null,null,null,null,null,null,null],
+[1.922,null,null,null,null,null,null,0.81,'HTJ2K_32: 1.922 ratio, 0.812 GB/s',null,null,null,null,null,null],
+[1.947,null,null,null,null,null,null,null,null,1.04,'HTJ2K_256: 1.947 ratio, 1.045 GB/s',null,null,null,null],
+[1.905,null,null,null,null,null,null,null,null,null,null,0.67,'JXL1: 1.905 ratio, 0.671 GB/s',null,null],
+[1.940,null,null,null,null,null,null,null,null,null,null,0.47,'JXL3: 1.940 ratio, 0.469 GB/s',null,null],
+[2.090,null,null,null,null,null,null,null,null,null,null,0.47,'JXL4: 2.090 ratio, 0.467 GB/s',null,null],
+[2.180,null,null,null,null,null,null,null,null,null,null,0.38,'JXL7: 2.180 ratio, 0.382 GB/s',null,null],
+[2.434,null,null,null,null,null,null,null,null,null,null,0.33,'JXL8: 2.434 ratio, 0.325 GB/s',null,null],
+[1.907,null,null,null,null,null,null,null,null,null,null,null,null,7.86,'Mop0: 1.907 ratio, 7.861 GB/s'],
+[1.966,null,null,null,null,null,null,null,null,null,null,null,null,8.02,'Mop1: 1.966 ratio, 8.016 GB/s'],
+[2.011,null,null,null,null,null,null,null,null,null,null,null,null,7.86,'Mop2: 2.011 ratio, 7.861 GB/s'],
+[2.028,null,null,null,null,null,null,null,null,null,null,null,null,8.06,'Mop3: 2.028 ratio, 8.056 GB/s'],
+[2.248,null,null,null,null,null,null,null,null,null,null,null,null,6.74,'Mop2/1: 2.248 ratio, 6.739 GB/s'],
+[2.301,null,null,null,null,null,null,null,null,null,null,null,null,6.87,'Mop2/3: 2.301 ratio, 6.868 GB/s'],
+[2.316,null,null,null,null,null,null,null,null,null,null,null,null,6.97,'Mop2/10: 2.316 ratio, 6.974 GB/s'],
+[2.340,null,null,null,null,null,null,null,null,null,null,null,null,6.80,'Mop3/20: 2.340 ratio, 6.805 GB/s']
+]);
+var options = {
+    title: 'Compression',
+    pointSize: 18,
+    series: {
+        0: {pointSize: 8},
+        1: {pointSize: 8},
+        2: {pointSize: 8},
+        3: {pointSize: 8},
+        4: {pointSize: 8},
+        5: {pointSize: 8},
+        6: {pointSize: 8},
+        100:{}},
+    hAxis: {title: 'Compression ratio', viewWindow: {min:1.0,max:3.0}},
+    vAxis: {title: 'Compression, GB/s', viewWindow: {min:0, max:6.0}},
+    chartArea: {left:60, right:10, top:50, bottom:50},
+    legend: {position: 'top'},
+    colors: [
+'#6080a0','#ff9a44','#12b520','#0094ef','#0094ef','#e01010','#ac74d0']
+};
+var chw = new google.visualization.ScatterChart(document.getElementById('chart_w'));
+chw.draw(dw, options);
+
+options.title = 'Decompression';
+options.vAxis.title = 'Decompression, GB/s';
+options.vAxis.viewWindow.max = 16.0;
+var chr = new google.visualization.ScatterChart(document.getElementById('chart_r'));
+chr.draw(dr, options);
+}
+</script>

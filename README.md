@@ -6,7 +6,7 @@ A quick test for various *lossless* compression modes of floating point images. 
 OpenEXR has been the go-to format for that; here I compare several existing lossless compression
 modes in it (ZIP, PIZ, RLE), as well as others:
 
-- OpenEXR, with upcoming `HTJ2K` compression mode. This is based on "[High-Throughput JPEG 2000](https://jpeg.org/jpeg2000/htj2k.html)"
+- OpenEXR, with the new `HTJ2K` compression. This is based on "[High-Throughput JPEG 2000](https://jpeg.org/jpeg2000/htj2k.html)"
   format/algorithms, using open source [OpenJPH](https://github.com/aous72/OpenJPH) library.
 - [JPEG-XL](https://jpeg.org/jpegxl/index.html) file format, using open source [libjxl](https://github.com/libjxl/libjxl)
   library.
@@ -105,9 +105,10 @@ Total uncompressed size: 3122MB. Uploaded separately, in order to not blow up Gi
 
 Obtained through cmake `FetchContent`:
 
-- [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) - 2025 Jun, 3.4.0-dev with HTJ2K support (rev 45ee12752).
-- [libjxl](https://github.com/libjxl/libjxl) - 2025 Jun, rev a75b322e.
-- [meshoptimizer](https://github.com/zeux/meshoptimizer) - 2025 Jun, v0.24.
+- [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) - 2025 Sep, 3.4.0.
+- [libjxl](https://github.com/libjxl/libjxl) - 2025 Sep, pre-v0.12 (rev 029cec4).
+- [meshoptimizer](https://github.com/zeux/meshoptimizer) - 2025 Aug, v0.25.
+- [zstd](https://github.com/facebook/zstd) - 2025 Feb, v1.5.7.
 
 Directly in source tree:
 
